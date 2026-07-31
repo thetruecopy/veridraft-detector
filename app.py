@@ -1,76 +1,59 @@
 import streamlit as st
-import re
-from transformers import pipeline
+from detector import analyze_text, extract_text_from_pdf, extract_text_from_docx
 
 st.set_page_config(page_title="Veridraft AI Detector", page_icon="📝")
 
 st.markdown("## Veridraft AI Detector")
-st.write("Paste your text below to analyze sentence-level AI vs. Human probabilities.")
+st.write("Paste your text or upload a document (.pdf, .docx, .txt) to analyze AI vs. Human probabilities.")
 
-@st.cache_resource
-def load_detector():
-    # Switching to a more robust open-source detector model
-    return pipeline("text-classification", model="Hello-SimpleAI/chatgpt-detector-roberta")
+input_method = st.radio("Choose input method:", ["Paste Text", "Upload Document"])
 
-with st.spinner("Loading AI detection model..."):
-    detector = load_detector()
+text_input = ""
 
-text_input = st.text_area(
-    "Enter text to analyze:",
-    value="",
-    placeholder="Please enter your text...",
-    height=150
-)
+if input_method == "Paste Text":
+    text_input = st.text_area(
+        "Enter text to analyze:",
+        value="",
+        placeholder="Please enter your text...",
+        height=150
+    )
+else:
+    uploaded_file = st.file_uploader("Upload a document", type=["pdf", "docx", "txt"])
+    if uploaded_file is not None:
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        if file_extension == "pdf":
+            text_input = extract_text_from_pdf(uploaded_file)
+        elif file_extension == "docx":
+            text_input = extract_text_from_docx(uploaded_file)
+        elif file_extension == "txt":
+            text_input = uploaded_file.getvalue().decode("utf-8")
+        
+        if text_input.strip():
+            st.info(f"Successfully extracted text from `{uploaded_file.name}`.")
 
 if st.button("Analyze Text"):
     if not text_input.strip():
-        st.warning("Please enter some text to analyze.")
+        st.warning("Please enter or upload some text to analyze.")
     else:
         with st.spinner("Analyzing sentences with AI model..."):
-            sentences = [
-                s.strip()
-                for s in re.split(r'(?<=[.!?])\s+', text_input)
-                if s.strip()
-            ]
+            overall_ai, overall_human, sentences, scores = analyze_text(text_input)
 
-            sentence_scores = []
+        st.success("Analysis complete!")
 
-            for sentence in sentences:
-                result = detector(sentence)[0]
-                label = result['label'].lower()
-                score = result['score'] * 100
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(
+                label="Overall AI Probability",
+                value=f"{overall_ai:.1f}%",
+            )
+        with col2:
+            st.metric(
+                label="Overall Human Probability",
+                value=f"{overall_human:.1f}%",
+            )
 
-                # Map model labels to AI probability
-                if 'chatgpt' in label or 'ai' in label or 'fake' in label or label == 'label_1':
-                    ai_prob = score
-                else:
-                    ai_prob = 100.0 - score
+        st.markdown("---")
+        st.subheader("Sentence Breakdown")
 
-                sentence_scores.append(ai_prob)
-
-            if sentence_scores:
-                overall_ai_probability = sum(sentence_scores) / len(sentence_scores)
-                overall_human_probability = 100.0 - overall_ai_probability
-            else:
-                overall_ai_probability = 0.0
-                overall_human_probability = 100.0
-
-            st.success("Analysis complete!")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(
-                    label="Overall AI Probability",
-                    value=f"{overall_ai_probability:.1f}%",
-                )
-            with col2:
-                st.metric(
-                    label="Overall Human Probability",
-                    value=f"{overall_human_probability:.1f}%",
-                )
-
-            st.markdown("---")
-            st.subheader("Sentence Breakdown")
-
-            for sentence, score in zip(sentences, sentence_scores):
-                st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
+        for sentence, score in zip(sentences, scores):
+            st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
