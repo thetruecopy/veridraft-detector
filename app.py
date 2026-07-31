@@ -5,7 +5,7 @@ from transformers import pipeline
 st.set_page_config(page_title="Veridraft AI Detector", page_icon="📝")
 
 st.markdown("## Veridraft AI Detector")
-st.write("Paste your text below to analyze sentence-level AI vs. Human probabilities.")
+st.write("Debugging raw model outputs and sentence-level predictions.")
 
 @st.cache_resource
 def load_detector():
@@ -36,10 +36,14 @@ if st.button("Analyze Text"):
 
             for sentence in sentences:
                 result = detector(sentence)[0]
-                label = result['label'].lower()
+                label = result['label']
                 score = result['score'] * 100
 
-                if 'ai' in label or 'fake' in label or label == 'label_1':
+                # Display raw label for debugging
+                st.write(f"**Raw Model Output:** Label: `{label}`, Score: `{score:.2f}%` for sentence: *{sentence}*")
+
+                # Map based on standard binary classifier conventions
+                if 'ai' in label.lower() or 'fake' in label.lower() or label == 'LABEL_1':
                     ai_prob = score
                 else:
                     ai_prob = 100.0 - score
@@ -53,8 +57,7 @@ if st.button("Analyze Text"):
                 overall_ai_probability = 0.0
                 overall_human_probability = 100.0
 
-            st.success("Analysis complete!")
-
+            st.markdown("---")
             col1, col2 = st.columns(2)
             with col1:
                 st.metric(
@@ -66,9 +69,3 @@ if st.button("Analyze Text"):
                     label="Overall Human Probability",
                     value=f"{overall_human_probability:.1f}%",
                 )
-
-            st.markdown("---")
-            st.subheader("Sentence Breakdown")
-
-            for sentence, score in zip(sentences, sentence_scores):
-                st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
