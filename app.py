@@ -1,5 +1,8 @@
 import streamlit as st
-from detector import analyze_text, extract_text_from_pdf, extract_text_from_docx, MAX_CHARS
+import requests
+from detector import extract_text_from_pdf, extract_text_from_docx, MAX_CHARS
+
+API_URL = "http://127.0.0.1:8000/analyze"
 
 st.set_page_config(page_title="Veridraft AI Detector", page_icon="📝")
 
@@ -36,43 +39,52 @@ if st.button("Analyze Text"):
         st.warning("Please enter or upload some text to analyze.")
     else:
         try:
-            with st.spinner("Analyzing sentences with AI model..."):
-                overall_ai, overall_human, sentences, scores = analyze_text(text_input)
-
-            st.success("Analysis complete!")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(
-                    label="Overall AI Probability",
-                    value=f"{overall_ai:.1f}%",
-                )
-            with col2:
-                st.metric(
-                    label="Overall Human Probability",
-                    value=f"{overall_human:.1f}%",
-                )
-
-            # Generate report content for download
-            report_content = f"--- Veridraft AI Detection Report ---\n"
-            report_content += f"Overall AI Probability: {overall_ai:.1f}%\n"
-            report_content += f"Overall Human Probability: {overall_human:.1f}%\n\n"
-            report_content += "--- Sentence Breakdown ---\n"
-            for sentence, score in zip(sentences, scores):
-                report_content += f"[AI Prob: {score:.1f}%] {sentence}\n"
-
-            st.download_button(
-                label="📥 Download Analysis Report",
-                data=report_content,
-                file_name="veridraft_report.txt",
-                mime="text/plain"
-            )
-
-            st.markdown("---")
-            st.subheader("Sentence Breakdown")
-
-            for sentence, score in zip(sentences, scores):
-                st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
+            with st.spinner("Calling backend API for analysis..."):
+                response = requests.post(API_URL, json={"text": text_input})
                 
-        except ValueError as e:
-            st.error(str(e))
+                if response.status_code != 200:
+                    error_detail = response.json().get("detail", "An error occurred.")
+                    st.error(error_detail)
+                else:
+                    data = response.json()
+                    overall_ai = data["ai_probability"]
+                    overall_human = data["human_probability"]
+                    sentences = data["sentences"]
+                    scores = data["scores"]
+
+                    st.success("Analysis complete!")
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric(
+                            label="Overall AI Probability",
+                            value=f"{overall_ai:.1f}%",
+                        )
+                    with col2:
+                        st.metric(
+                            label="Overall Human Probability",
+                            value=f"{overall_human:.1f}%",
+                        )
+
+                    report_content = f"--- Veridraft AI Detection Report ---\n"
+                    report_content += f"Overall AI Probability: {overall_ai:.1f}%\n"
+                    report_content += f"Overall Human Probability: {overall_human:.1f}%\n\n"
+                    report_content += "--- Sentence Breakdown ---\n"
+                    for sentence, score in zip(sentences, scores):
+                        report_content += f"[AI Prob: {score:.1f}%] {sentence}\n"
+
+                    st.download_button(
+                        label="📥 Download Analysis Report",
+                        data=report_content,
+                        file_name="veridraft_report.txt",
+                        mime="text/plain"
+                    )
+
+                    st.markdown("---")
+                    st.subheader("Sentence Breakdown")
+
+                    for sentence, score in zip(sentences, scores):
+                        st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
+                        
+        except requests.exceptions.ConnectionError:
+            st.error("Could not connect to the backend API. Make sure FastAPI is running.")

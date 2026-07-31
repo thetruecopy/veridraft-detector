@@ -3,3 +3,6 @@ transformers
 torch
 pypdf
 python-docx
+fastapi
+uvicorn
+requests
