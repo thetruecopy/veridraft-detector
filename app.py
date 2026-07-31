@@ -16,7 +16,8 @@ with st.spinner("Loading AI detection model..."):
 
 text_input = st.text_area(
     "Enter text to analyze:",
-    value="I love mangoes. Mangoes love me. I went to the market to buy yummy veggies, fruits, and groceries for the party. Let's have a party!",
+    value="",
+    placeholder="Please enter your text...",
     height=150
 )
 
