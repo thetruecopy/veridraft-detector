@@ -53,6 +53,21 @@ if st.button("Analyze Text"):
                     value=f"{overall_human:.1f}%",
                 )
 
+            # Generate report content for download
+            report_content = f"--- Veridraft AI Detection Report ---\n"
+            report_content += f"Overall AI Probability: {overall_ai:.1f}%\n"
+            report_content += f"Overall Human Probability: {overall_human:.1f}%\n\n"
+            report_content += "--- Sentence Breakdown ---\n"
+            for sentence, score in zip(sentences, scores):
+                report_content += f"[AI Prob: {score:.1f}%] {sentence}\n"
+
+            st.download_button(
+                label="📥 Download Analysis Report",
+                data=report_content,
+                file_name="veridraft_report.txt",
+                mime="text/plain"
+            )
+
             st.markdown("---")
             st.subheader("Sentence Breakdown")
 
