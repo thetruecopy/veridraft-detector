@@ -1,10 +1,10 @@
 import streamlit as st
-from detector import analyze_text, extract_text_from_pdf, extract_text_from_docx
+from detector import analyze_text, extract_text_from_pdf, extract_text_from_docx, MAX_CHARS
 
 st.set_page_config(page_title="Veridraft AI Detector", page_icon="📝")
 
 st.markdown("## Veridraft AI Detector")
-st.write("Paste your text or upload a document (.pdf, .docx, .txt) to analyze AI vs. Human probabilities.")
+st.write(f"Paste your text or upload a document (.pdf, .docx, .txt) to analyze AI vs. Human probabilities. *(Max {MAX_CHARS:,} characters)*")
 
 input_method = st.radio("Choose input method:", ["Paste Text", "Upload Document"])
 
@@ -35,25 +35,29 @@ if st.button("Analyze Text"):
     if not text_input.strip():
         st.warning("Please enter or upload some text to analyze.")
     else:
-        with st.spinner("Analyzing sentences with AI model..."):
-            overall_ai, overall_human, sentences, scores = analyze_text(text_input)
+        try:
+            with st.spinner("Analyzing sentences with AI model..."):
+                overall_ai, overall_human, sentences, scores = analyze_text(text_input)
 
-        st.success("Analysis complete!")
+            st.success("Analysis complete!")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric(
-                label="Overall AI Probability",
-                value=f"{overall_ai:.1f}%",
-            )
-        with col2:
-            st.metric(
-                label="Overall Human Probability",
-                value=f"{overall_human:.1f}%",
-            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    label="Overall AI Probability",
+                    value=f"{overall_ai:.1f}%",
+                )
+            with col2:
+                st.metric(
+                    label="Overall Human Probability",
+                    value=f"{overall_human:.1f}%",
+                )
 
-        st.markdown("---")
-        st.subheader("Sentence Breakdown")
+            st.markdown("---")
+            st.subheader("Sentence Breakdown")
 
-        for sentence, score in zip(sentences, scores):
-            st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
+            for sentence, score in zip(sentences, scores):
+                st.markdown(f"**AI Prob: {score:.1f}%** — {sentence}")
+                
+        except ValueError as e:
+            st.error(str(e))

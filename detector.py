@@ -4,6 +4,8 @@ import streamlit as st
 from pypdf import PdfReader
 from docx import Document
 
+MAX_CHARS = 10000
+
 @st.cache_resource
 def load_detector():
     return pipeline("text-classification", model="Hello-SimpleAI/chatgpt-detector-roberta")
@@ -21,6 +23,9 @@ def extract_text_from_docx(uploaded_file):
     return text
 
 def analyze_text(text_input):
+    if len(text_input) > MAX_CHARS:
+        raise ValueError(f"Text exceeds the maximum limit of {MAX_CHARS} characters.")
+
     detector = load_detector()
     sentences = [
         s.strip()
