@@ -5,14 +5,25 @@ import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+# Optional imports for document processing
+try:
+    import pypdf
+except ImportError:
+    pypdf = None
+
+try:
+    import docx
+except ImportError:
+    docx = None
+
 # 1. Page Configuration
 st.set_page_config(
     page_title="Veridraft AI Detector Pro",
     page_icon="🔍",
-    layout="centered"
+    layout="wide"
 )
 
-# 2. Cache & Load RoBERTa Model
+# 2. Cache & Load Model
 @st.cache_resource
 def load_model():
     model_name = "Hello-SimpleAI/chatgpt-detector-roberta"
@@ -22,7 +33,7 @@ def load_model():
 
 tokenizer, model = load_model()
 
-# 3. Sliding Window Inference & Metric Helpers
+# 3. Detection Engine & Helper Functions
 def chunked_ai_predict(text, tokenizer, model, chunk_size=512, overlap=128):
     """Evaluates long texts in overlapping token windows to prevent truncation."""
     tokens = tokenizer(text, return_tensors="pt", truncation=False)
@@ -58,15 +69,38 @@ def calculate_burstiness(text):
     """Calculates Coefficient of Variation (CV) for sentence length variance."""
     sentences = [s.strip() for s in re.split(r'[.!?]+', text) if s.strip()]
     if len(sentences) <= 1:
-        return 0.0
+        return 0.0, sentences
     lengths = [len(s.split()) for s in sentences]
     mean_len = np.mean(lengths)
     if mean_len == 0:
-        return 0.0
-    return float(np.std(lengths) / mean_len)
+        return 0.0, sentences
+    cv = float(np.std(lengths) / mean_len)
+    return cv, sentences
+
+def extract_text_from_file(uploaded_file):
+    """Extracts raw text from TXT, PDF, or DOCX files."""
+    file_type = uploaded_file.name.split(".")[-1].lower()
+    text = ""
+    
+    if file_type == "txt":
+        text = uploaded_file.read().decode("utf-8")
+    elif file_type == "pdf":
+        if pypdf:
+            reader = pypdf.PdfReader(uploaded_file)
+            text = "\n".join([page.extract_text() or "" for page in reader.pages])
+        else:
+            st.error("pypdf is not installed. Please add 'pypdf' to requirements.txt")
+    elif file_type == "docx":
+        if docx:
+            doc = docx.Document(uploaded_file)
+            text = "\n".join([p.text for p in doc.paragraphs])
+        else:
+            st.error("python-docx is not installed. Please add 'python-docx' to requirements.txt")
+            
+    return re.sub(r'\s+', ' ', text).strip()
 
 def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
-    """Sends logged sample payload directly to Discord via Webhook."""
+    """Posts logging payload to Discord via Webhook."""
     webhook_url = st.secrets.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         st.error("Missing DISCORD_WEBHOOK_URL in Streamlit Secrets.")
@@ -89,61 +123,99 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
         st.error(f"Failed to post to Discord: {e}")
         return False
 
-# 4. Main UI Layout
+# 4. Sidebar Controls
+with st.sidebar:
+    st.title("⚙️ Model Controls")
+    st.markdown("**Veridraft Engine:** RoBERTa Sliding-Window")
+    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.90, 0.55, 0.05)
+    st.markdown("---")
+    st.markdown("**Metrics Explanation:**")
+    st.markdown("- **AI Probability:** Multi-window token analysis score.")
+    st.markdown("- **Burstiness (CV):** Sentence length variance (values < 0.40 indicate uniform AI-like rhythm).")
+
+# 5. Main UI Header & Inputs
 st.title("Veridraft AI Detector Pro 🔍")
-st.write("Hybrid context & burstiness scoring pipeline for AI text verification.")
+st.caption("Hybrid macro-context chunking & burstiness scoring pipeline")
 
-user_text = st.text_area(
-    "Paste text to analyze:", 
-    height=200, 
-    placeholder="Enter essay, article, or document text here..."
-)
+tab_text, tab_file = st.tabs(["📝 Paste Text", "📁 Upload Document"])
 
-if st.button("Analyze Text", type="primary"):
+user_text = ""
+
+with tab_text:
+    pasted_text = st.text_area(
+        "Paste document text:", 
+        height=220, 
+        placeholder="Paste essay, research paper, or article here..."
+    )
+    if pasted_text:
+        user_text = pasted_text
+
+with tab_file:
+    uploaded_file = st.file_uploader(
+        "Upload a document (.pdf, .docx, .txt)", 
+        type=["pdf", "docx", "txt"]
+    )
+    if uploaded_file:
+        user_text = extract_text_from_file(uploaded_file)
+        if user_text:
+            st.info(f"Extracted {len(user_text.split())} words from {uploaded_file.name}")
+
+analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
+
+# 6. Model Execution
+if analyze_btn:
     if not user_text.strip():
-        st.warning("Please enter some text before analyzing.")
+        st.warning("Please paste text or upload a document first.")
     else:
         with st.spinner("Executing sliding-window chunking & burstiness analysis..."):
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
-            burstiness_cv = calculate_burstiness(user_text)
+            burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # Calibrated Hybrid Weighting: AI models have distinct low sentence variance (CV < 0.40)
+            # Calibrated Hybrid Weighting for low sentence variance (CV < 0.40)
             calibrated_prob = base_ai_prob
             if burstiness_cv < 0.40 and base_ai_prob > 0.05:
                 calibrated_prob = min(1.0, base_ai_prob * 1.45)
 
-            st.session_state["last_analysis"] = {
+            st.session_state["analysis_result"] = {
                 "text": user_text,
                 "ai_prob": calibrated_prob,
-                "burstiness_cv": burstiness_cv
+                "burstiness_cv": burstiness_cv,
+                "sentence_count": len(sentences),
+                "word_count": len(user_text.split())
             }
 
-# 5. Display Analysis Results & Feedback Form
-if "last_analysis" in st.session_state:
-    res = st.session_state["last_analysis"]
-    st.divider()
-    st.subheader("Analysis Results")
+# 7. Render Full Results Dashboard
+if "analysis_result" in st.session_state:
+    res = st.session_state["analysis_result"]
     
-    col1, col2 = st.columns(2)
+    st.markdown("---")
+    st.subheader("📊 Analysis Results")
+
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("AI Probability", f"{res['ai_prob']:.1%}")
     col2.metric("Burstiness (CV)", f"{res['burstiness_cv']:.3f}")
+    col3.metric("Word Count", res['word_count'])
+    col4.metric("Sentences", res['sentence_count'])
 
-    if res['ai_prob'] >= 0.55:
-        st.error("High probability of AI-generated text.")
+    # Verdict Banner
+    if res['ai_prob'] >= sensitivity:
+        st.error(f"🔴 **High Probability AI-Generated** (Exceeds {sensitivity:.0%} sensitivity threshold)")
     elif res['ai_prob'] >= 0.30:
-        st.warning("Mixed signals / potentially AI-assisted or edited text.")
+        st.warning("🟡 **Mixed Origin / Likely AI-Assisted** (Contains structural edits or hybrid prose)")
     else:
-        st.success("High probability of human-written text.")
+        st.success("🟢 **High Probability Human-Written** (Natural sentence variance detected)")
 
-    # In-App Feedback Form
-    st.divider()
+    st.progress(res['ai_prob'])
+
+    # Feedback Form Section
+    st.markdown("---")
     with st.expander("⚠️ Report Inaccurate Result / Log Edge Case"):
         with st.form("feedback_form", clear_on_submit=True):
             actual_label = st.radio(
                 "What is the actual origin of this text?",
                 ["Human Written", "AI Generated", "Mixed / Lightly Edited"]
             )
-            user_notes = st.text_area("Additional context (e.g., non-native author, academic format):")
+            user_notes = st.text_area("Additional context (e.g., non-native writer, academic format):")
             
             if st.form_submit_button("Submit Feedback"):
                 success = log_edge_case(
