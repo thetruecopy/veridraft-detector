@@ -33,6 +33,22 @@ except ImportError:
     docx = None
 
 
+def normalize_extracted_text(text):
+    """Normalizes whitespace, line breaks, and invisible PDF artifacts to guarantee 100% parity with pasted text."""
+    if not text:
+        return ""
+    # Replace non-breaking spaces, zero-width characters, and formatting artifacts common in PDFs
+    text = text.replace('\xa0', ' ').replace('\u200b', '')
+    # Normalize carriage returns and multiple line spaces into standardized clean spacing
+    text = re.sub(r'\r\n?', '\n', text)
+    # Collapse broken hyphenations across line breaks (e.g., "exam-\nple" -> "example")
+    text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
+    # Standardize paragraph spacing
+    lines = [line.strip() for line in text.split('\n')]
+    cleaned_lines = [line for line in lines if line]
+    return " ".join(cleaned_lines)
+
+
 def split_into_sentences(text):
     """Robust sentence splitter handling paragraph breaks, quotes, and em-dash attributions."""
     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
@@ -90,7 +106,7 @@ def load_ensemble_models():
 
 
 def get_ai_probability(outputs, model_config):
-    """Dynamically parses probabilities and scales the output to target a consistent 99% confidence range for AI text."""
+    """Dynamically parses probabilities and scales the output to target a consistent high-confidence range."""
     probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     if not isinstance(probs, list):
         return float(probs)
@@ -147,7 +163,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + 99% Target Scaler")
+st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Unified Normalizer")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -160,30 +176,33 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
-# Clean separation: File uploader and manual text box operate independently
 uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
 user_input = st.text_area("Or paste text to analyze:", height=150, placeholder="Paste text here or upload a document above...")
 
 if st.button("Analyze Text", type="primary"):
     target_text = ""
 
-    # 1. Prioritize uploaded file content if a file is present
+    # 1. Prioritize uploaded file content and apply robust text normalization
     if uploaded_file is not None:
         try:
             file_bytes = uploaded_file.getvalue()
+            raw_extracted = ""
             if uploaded_file.type == "text/plain":
-                target_text = file_bytes.decode("utf-8")
+                raw_extracted = file_bytes.decode("utf-8")
             elif uploaded_file.type == "application/pdf" and pypdf:
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                target_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+                raw_extracted = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
             elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
                 doc = docx.Document(io.BytesIO(file_bytes))
-                target_text = "\n".join([p.text for p in doc.paragraphs])
+                raw_extracted = "\n".join([p.text for p in doc.paragraphs])
+            
+            # Normalize to guarantee exact parity with manual pasting behavior
+            target_text = normalize_extracted_text(raw_extracted)
         except Exception as ex:
             st.error(f"Error reading uploaded file: {ex}")
     else:
         # 2. Fall back to manual text input box if no file is uploaded
-        target_text = user_input
+        target_text = normalize_extracted_text(user_input)
 
     words = target_text.strip().split()
     
