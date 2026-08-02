@@ -39,12 +39,10 @@ if "last_request_time" not in st.session_state:
 @st.cache_resource
 def load_ensemble_models():
     """Loads a dual-model ensemble for cross-model verification."""
-    # Model 1: Primary ChatGPT RoBERTa Detector
     m1_name = "Hello-SimpleAI/chatgpt-detector-roberta"
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
 
-    # Model 2: Secondary OpenAI RoBERTa Detector
     m2_name = "roberta-base-openai-detector"
     tok2 = AutoTokenizer.from_pretrained(m2_name)
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
@@ -65,7 +63,6 @@ def predict_single_model(text, tokenizer, model, chunk_size=512, overlap=128):
         with torch.no_grad():
             outputs = model(**inputs)
             probs = torch.softmax(outputs.logits, dim=-1)
-            # Default index 1 represents positive AI/fake class in these architectures
             return float(probs[0][1].item())
     
     step = chunk_size - overlap
@@ -146,11 +143,14 @@ def generate_csv_report(res):
 
 def generate_text_report(res):
     """Generates a plain-text verification certificate/audit report."""
+    time_str = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+    snippet_str = res['text'][:400] + "..."
+    
     lines = [
         "==================================================",
         "     VERIDRAFT AI DETECTOR PRO - AUDIT REPORT     ",
         "==================================================",
-        f"Timestamp:              {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
+        f"Timestamp:              {time_str}",
         f"Word Count:             {res['word_count']}",
         f"Sentences:              {res['sentence_count']}",
         "--------------------------------------------------",
@@ -161,7 +161,7 @@ def generate_text_report(res):
         f"• Burstiness Metric CV: {res['burstiness_cv']:.3f}",
         "--------------------------------------------------",
         "TEXT SNIPPET EVALUATED:",
-        f"{res['text'][:400]}...",
+        snippet_str,
         "=================================================="
     ]
     return "\n".join(lines)
@@ -189,13 +189,15 @@ def extract_text_from_file(uploaded_file):
     return re.sub(r'\s+', ' ', text).strip()
 
 def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
-    """Logs edge case payload to Supabase Database REST API and/or Discord Webhook."""
+    """Logs edge case payload to Supabase Database REST API and/or Discord Webhook cleanly."""
     discord_url = st.secrets.get("DISCORD_WEBHOOK_URL")
     supabase_url = st.secrets.get("SUPABASE_URL")
     supabase_key = st.secrets.get("SUPABASE_KEY")
     
-    snippet = raw_text[:300].replace("`", "")
-    note_text = notes if notes else "None"
+    clean_snippet = raw_text[:300].replace('`', '').replace('\n', ' ')
+    note_text = notes.strip() if notes else "None"
+    score_formatted = f"{score:.1%}"
+    cv_formatted = f"{cv_metric:.3f}"
     logged_anywhere = False
 
     # 1. Supabase REST Logging
@@ -213,7 +215,7 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
                 "predicted_score": float(score),
                 "burstiness_cv": float(cv_metric),
                 "user_notes": note_text,
-                "text_snippet": snippet
+                "text_snippet": clean_snippet
             }
             sb_res = requests.post(endpoint, json=data, headers=headers)
             if sb_res.status_code in (200, 201):
@@ -223,13 +225,13 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
 
     # 2. Discord Webhook Logging
     if discord_url:
-        lines = [
-            "🚨 **New Edge Case Logged**",
-            f"• **Ground Truth:** {actual_label}",
-            f"• **Ensemble AI Score:** {score:.1%}",
-            f"• **Burstiness (CV):** {cv_metric:.3f}",
-            f"• **User Notes:** {note_text}",
-            "• **Text Snippet:**",
-            "```",
-            f"{snippet}...",
+        discord_msg = (
+            "🚨 **New Edge Case Logged**\n"
+            f"• **Ground Truth:** {actual_label}\n"
+            f"• **Ensemble AI Score:** {score_formatted}\n"
+            f"• **Burstiness (CV):** {cv_formatted}\n"
+            f"• **User Notes:** {note_text}\n"
+            "• **Text Snippet:**\n"
+            "```\n"
+            f"{clean_snippet}...\n"
             "
