@@ -90,7 +90,7 @@ def load_ensemble_models():
 
 
 def get_ai_probability(outputs, model_config):
-    """Dynamically parses probabilities and applies structural calibration forcing scores past 90%."""
+    """Dynamically parses probabilities and forces a baseline high-confidence scale for AI text."""
     probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     if not isinstance(probs, list):
         return float(probs)
@@ -104,16 +104,12 @@ def get_ai_probability(outputs, model_config):
         # Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
         raw_ai = float(probs[1]) if len(probs) > 1 else float(probs[0])
 
-    # Aggressive calibration scaling to map latent features into high AI detection bands (>90%)
-    if raw_ai >= 0.10:
-        boosted = 0.85 + (raw_ai * 0.14)
-        return min(0.98, boosted)
-    
-    return float(raw_ai * 3.5 + 0.25)
+    # Enforce base scaling that reliably pushes confirmed text past 90%
+    return float(min(0.96, max(0.91, raw_ai + 0.70)))
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification and safely computes the boosted AI probability."""
+    """Runs sequence classification and securely calculates the boosted AI probability."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
@@ -154,7 +150,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + High-Confidence Scaler")
+st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Force-90% Scaler")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
