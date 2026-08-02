@@ -95,7 +95,7 @@ def load_ensemble_models():
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification with explicit, hardcoded AI label indices per model."""
+    """Runs sequence classification with strict model name checks and raw index mapping."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
@@ -104,18 +104,16 @@ def predict_text(text, tok, mod):
     if not isinstance(probs, list):
         return float(probs)
 
-    # Get model name or path
     model_name = getattr(mod.config, "_name_or_path", "").lower()
 
-    # roberta-base-openai-detector: Label 0 = Fake (AI), Label 1 = Real (Human)
+    # 1. roberta-base-openai-detector: Index 0 is Fake (AI), Index 1 is Real (Human)
     if "roberta-base-openai-detector" in model_name:
         return probs[0]
     
-    # Hello-SimpleAI/chatgpt-detector-roberta: Label 0 = Human, Label 1 = ChatGPT (AI)
+    # 2. chatgpt-detector-roberta: Index 0 is Human, Index 1 is ChatGPT (AI)
     if "chatgpt-detector-roberta" in model_name:
         return probs[1]
 
-    # Fallback for generic detectors
     return probs[1]
 
 
