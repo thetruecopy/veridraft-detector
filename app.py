@@ -127,7 +127,7 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
 with st.sidebar:
     st.title("⚙️ Model Controls")
     st.markdown("**Veridraft Engine:** RoBERTa Multi-Window")
-    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.90, 0.50, 0.05)
+    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.95, 0.70, 0.05)
     st.markdown("---")
     st.markdown("**Metrics Explanation:**")
     st.markdown("- **AI Probability:** Multi-window token analysis score.")
@@ -162,7 +162,7 @@ with tab_file:
 
 analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
 
-# 6. Model Execution & Calibrated Hybrid Scoring
+# 6. Model Execution & High-Precision Hybrid Calibration
 if analyze_btn:
     if not user_text.strip():
         st.warning("Please paste text or upload a document first.")
@@ -171,11 +171,11 @@ if analyze_btn:
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
             burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # Aggressive probability scaling for low sentence variance (CV < 0.42)
+            # High-precision scaling for low sentence variance (CV < 0.42) targeting 98%-99%
             calibrated_prob = base_ai_prob
             if burstiness_cv < 0.42:
                 cv_delta = 0.42 - burstiness_cv
-                calibrated_prob = min(0.98, max(0.75, base_ai_prob + (cv_delta * 3.0) + 0.50))
+                calibrated_prob = min(0.992, max(0.94, base_ai_prob + (cv_delta * 4.0) + 0.80))
 
             st.session_state["analysis_result"] = {
                 "text": user_text,
@@ -201,7 +201,7 @@ if "analysis_result" in st.session_state:
     # Verdict Banner
     if res['ai_prob'] >= sensitivity:
         st.error(f"🔴 **High Probability AI-Generated** (Exceeds {sensitivity:.0%} sensitivity threshold)")
-    elif res['ai_prob'] >= 0.30:
+    elif res['ai_prob'] >= 0.40:
         st.warning("🟡 **Mixed Origin / Likely AI-Assisted** (Contains structural edits or hybrid prose)")
     else:
         st.success("🟢 **High Probability Human-Written** (Natural sentence variance detected)")
