@@ -84,4 +84,121 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
             f"• **Predicted AI Score:** {score:.1%}\n"
             f"• **Burstiness (CV):** {cv_metric:.3f}\n"
             f"• **User Notes:** {notes if notes else 'None'}\n"
-            f"• **Text Snippet:** ```{raw_text[:300]}...
+            f"• **Text Snippet:** ```{raw_text[:300]}...```"
+        )
+    }
+    try:
+        res = requests.post(webhook_url, json=payload)
+        return res.status_code in (200, 204)
+    except Exception as e:
+        st.error(f"Failed to post to Discord: {e}")
+        return False
+
+# 4. Sidebar Controls
+with st.sidebar:
+    st.title("⚙️ Model Controls")
+    st.markdown("**Veridraft Engine:** RoBERTa Hybrid")
+    sensitivity = st.slider("Detection Sensitivity Threshold", 0.3, 0.9, 0.7, 0.05)
+    st.markdown("---")
+    st.markdown("**Metrics Explanation:**")
+    st.markdown("- **AI Score:** Model confidence probability.")
+    st.markdown("- **Burstiness (CV):** Sentence length variation. Lower values indicate uniform AI-like rhythm.")
+
+# 5. Main UI Header
+st.title("Veridraft AI Detector Pro 🔍")
+st.caption("Hybrid macro-context scanning & burstiness scoring pipeline")
+
+# Input Methods (Tabs)
+tab_text, tab_file = st.tabs(["📝 Paste Text", "📁 Upload Document"])
+
+user_text = ""
+
+with tab_text:
+    pasted_text = st.text_area(
+        "Paste document text:", 
+        height=220, 
+        placeholder="Paste essay, research paper, or article here..."
+    )
+    if pasted_text:
+        user_text = pasted_text
+
+with tab_file:
+    uploaded_file = st.file_uploader(
+        "Upload a document (.pdf, .docx, .txt)", 
+        type=["pdf", "docx", "txt"]
+    )
+    if uploaded_file:
+        user_text = extract_text_from_file(uploaded_file)
+        if user_text:
+            st.info(f"Extracted {len(user_text.split())} words from {uploaded_file.name}")
+
+analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
+
+# 6. Model Execution & Analysis
+if analyze_btn:
+    if not user_text.strip():
+        st.warning("Please paste text or upload a document first.")
+    else:
+        with st.spinner("Analyzing document structure and probability..."):
+            # Inference
+            inputs = tokenizer(user_text, return_tensors="pt", truncation=True, max_length=512)
+            with torch.no_grad():
+                outputs = model(**inputs)
+                probs = torch.softmax(outputs.logits, dim=-1)
+                ai_prob = probs[0][1].item()
+
+            # Burstiness
+            burstiness_cv, sentences = calculate_burstiness(user_text)
+
+            # Store results in session state
+            st.session_state["analysis_result"] = {
+                "text": user_text,
+                "ai_prob": ai_prob,
+                "burstiness_cv": burstiness_cv,
+                "sentence_count": len(sentences),
+                "word_count": len(user_text.split())
+            }
+
+# 7. Render Results Dashboard
+if "analysis_result" in st.session_state:
+    res = st.session_state["analysis_result"]
+    
+    st.markdown("---")
+    st.subheader("📊 Analysis Results")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("AI Probability", f"{res['ai_prob']:.1%}")
+    col2.metric("Burstiness (CV)", f"{res['burstiness_cv']:.3f}")
+    col3.metric("Word Count", res['word_count'])
+    col4.metric("Sentences", res['sentence_count'])
+
+    # Verdict Card
+    if res['ai_prob'] >= sensitivity:
+        st.error(f"🔴 **High Probability AI-Generated** (Confidence exceeds threshold {sensitivity:.0%})")
+    elif res['ai_prob'] >= 0.40:
+        st.warning("🟡 **Mixed Origin / Likely AI-Assisted** (Shows structural editing or hybrid writing)")
+    else:
+        st.success("🟢 **High Probability Human-Written** (Natural sentence length variation detected)")
+
+    st.progress(res['ai_prob'])
+
+    # 8. Feedback Form Section
+    st.markdown("---")
+    with st.expander("⚠️ Report Inaccurate Result / Log Edge Case"):
+        with st.form("feedback_form", clear_on_submit=True):
+            actual_label = st.radio(
+                "What is the actual origin of this text?",
+                ["Human Written", "AI Generated", "Mixed / Lightly Edited"]
+            )
+            user_notes = st.text_area("Additional context (e.g., non-native writer, academic format):")
+            
+            if st.form_submit_button("Submit Feedback"):
+                success = log_edge_case(
+                    actual_label, 
+                    user_notes, 
+                    res["text"], 
+                    res["ai_prob"], 
+                    res["burstiness_cv"]
+                )
+                if success:
+                    st.success("Logged! Case sent directly to your Discord webhook.")
