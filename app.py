@@ -73,7 +73,7 @@ def calculate_text_metrics(text, sentences):
     unique_words = len(set(words))
     ttr = (unique_words / total_words) * 100
 
-    # Estimated Perplexity Proxy (lower values indicate predictable/AI-like uniform structures)
+    # Estimated Perplexity Proxy
     perplexity_proxy = max(10.0, float(mean_len * (ttr / 10.0) * (1 + burstiness)))
 
     return burstiness, ttr, perplexity_proxy
@@ -95,14 +95,23 @@ def load_ensemble_models():
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification on a given string."""
+    """Runs sequence classification and dynamically targets the correct AI/Fake probability label."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
         probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     
+    # Check model ID2LABEL mapping to dynamically map AI/Fake index
+    id2label = getattr(mod.config, "id2label", {})
+    ai_index = 1  # Default fallback
+    
+    for idx, label in id2label.items():
+        if any(term in str(label).lower() for term in ["fake", "gpt", "ai", "chatgpt"]):
+            ai_index = int(idx)
+            break
+            
     if isinstance(probs, list):
-        return probs[1] if len(probs) > 1 else probs[0]
+        return probs[ai_index] if len(probs) > ai_index else probs[0]
     return float(probs)
 
 
