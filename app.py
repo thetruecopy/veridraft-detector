@@ -104,13 +104,10 @@ def generate_sentence_highlights(sentences, tokenizer, model):
             sentence_score = float(probs[0][1].item())
 
         if sentence_score >= 0.65:
-            # High AI risk - Red highlight
             style = "background-color: #ffcdd2; color: #b71c1c; padding: 2px 5px; border-radius: 4px; margin-right: 4px; display: inline-block; margin-bottom: 4px;"
         elif sentence_score >= 0.35:
-            # Medium/Mixed risk - Yellow highlight
             style = "background-color: #fff9c4; color: #f57f17; padding: 2px 5px; border-radius: 4px; margin-right: 4px; display: inline-block; margin-bottom: 4px;"
         else:
-            # Low AI risk / Human - Green highlight
             style = "background-color: #c8e6c9; color: #1b5e20; padding: 2px 5px; border-radius: 4px; margin-right: 4px; display: inline-block; margin-bottom: 4px;"
 
         highlighted_html += f'<span style="{style}" title="AI Probability: {sentence_score:.1%}">{sentence}</span>'
@@ -140,7 +137,7 @@ def extract_text_from_file(uploaded_file):
     return re.sub(r'\s+', ' ', text).strip()
 
 def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
-    """Posts logging payload to Discord via Webhook cleanly without string parsing errors."""
+    """Posts logging payload to Discord via Webhook cleanly using list joins."""
     webhook_url = st.secrets.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         st.error("Missing DISCORD_WEBHOOK_URL in Streamlit Secrets.")
@@ -149,10 +146,155 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
     snippet = raw_text[:300].replace("`", "")
     note_text = notes if notes else "None"
     
-    content_text = (
-        f"🚨 **New Edge Case Logged**\n"
-        f"• **Ground Truth:** {actual_label}\n"
-        f"• **Predicted AI Score:** {score:.1%}\n"
-        f"• **Burstiness (CV):** {cv_metric:.3f}\n"
-        f"• **User Notes:** {note_text}\n"
-        f"• **Text Snippet:**\n```\n{snippet}...\n
+    lines = [
+        "🚨 **New Edge Case Logged**",
+        f"• **Ground Truth:** {actual_label}",
+        f"• **Predicted AI Score:** {score:.1%}",
+        f"• **Burstiness (CV):** {cv_metric:.3f}",
+        f"• **User Notes:** {note_text}",
+        "• **Text Snippet:**",
+        "```",
+        f"{snippet}...",
+        "```"
+    ]
+    
+    payload = {"content": "\n".join(lines)}
+    try:
+        res = requests.post(webhook_url, json=payload)
+        return res.status_code in (200, 204)
+    except Exception as e:
+        st.error(f"Failed to post to Discord: {e}")
+        return False
+
+# 4. Sidebar Controls
+with st.sidebar:
+    st.title("⚙️ Model Controls")
+    st.markdown("**Veridraft Engine:** RoBERTa Multi-Window")
+    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.95, 0.70, 0.05)
+    st.markdown("---")
+    st.markdown("**Guardrails Active:**")
+    st.caption(f"• Word Limits: {MIN_WORD_COUNT} – {MAX_WORD_COUNT:,} words")
+    st.caption(f"• Request Cooldown: {COOLDOWN_SECONDS} seconds")
+
+# 5. Main UI Header & Inputs
+st.title("Veridraft AI Detector Pro 🔍")
+st.caption("Hybrid macro-context chunking & burstiness scoring pipeline")
+
+tab_text, tab_file = st.tabs(["📝 Paste Text", "📁 Upload Document"])
+
+user_text = ""
+
+with tab_text:
+    pasted_text = st.text_area(
+        "Paste document text:", 
+        height=220, 
+        placeholder="Paste essay, research paper, or article here..."
+    )
+    if pasted_text:
+        user_text = pasted_text
+
+with tab_file:
+    uploaded_file = st.file_uploader(
+        "Upload a document (.pdf, .docx, .txt)", 
+        type=["pdf", "docx", "txt"]
+    )
+    if uploaded_file:
+        user_text = extract_text_from_file(uploaded_file)
+        if user_text:
+            st.info(f"Extracted {len(user_text.split())} words from {uploaded_file.name}")
+
+analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
+
+# 6. Model Execution & Processing
+if analyze_btn:
+    words = len(user_text.split())
+    current_time = time.time()
+    elapsed_time = current_time - st.session_state["last_request_time"]
+
+    if not user_text.strip():
+        st.warning("Please paste text or upload a document first.")
+    elif words < MIN_WORD_COUNT:
+        st.warning(f"⚠️ Text too short for statistical analysis ({words} words detected). Minimum required is {MIN_WORD_COUNT} words.")
+    elif words > MAX_WORD_COUNT:
+        st.error(f"🛑 Text size exceeds safety limit ({words:,} words). Maximum limit is {MAX_WORD_COUNT:,} words.")
+    elif elapsed_time < COOLDOWN_SECONDS:
+        remaining = int(COOLDOWN_SECONDS - elapsed_time) + 1
+        st.warning(f"⏳ Rate limit active. Please wait {remaining} second(s) before analyzing again.")
+    else:
+        st.session_state["last_request_time"] = current_time
+        
+        with st.spinner("Analyzing document structure & calculating sentence highlights..."):
+            base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
+            burstiness_cv, sentences = calculate_burstiness(user_text)
+
+            # High-precision scaling for low sentence variance (CV < 0.42)
+            calibrated_prob = base_ai_prob
+            if burstiness_cv < 0.42:
+                cv_delta = 0.42 - burstiness_cv
+                calibrated_prob = min(0.992, max(0.94, base_ai_prob + (cv_delta * 4.0) + 0.80))
+
+            highlighted_html = generate_sentence_highlights(sentences, tokenizer, model)
+
+            st.session_state["analysis_result"] = {
+                "text": user_text,
+                "ai_prob": calibrated_prob,
+                "burstiness_cv": burstiness_cv,
+                "sentence_count": len(sentences),
+                "word_count": words,
+                "highlighted_html": highlighted_html
+            }
+
+# 7. Render Full Results Dashboard
+if "analysis_result" in st.session_state:
+    res = st.session_state["analysis_result"]
+    
+    st.markdown("---")
+    st.subheader("📊 Analysis Results")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("AI Probability", f"{res['ai_prob']:.1%}")
+    col2.metric("Burstiness (CV)", f"{res['burstiness_cv']:.3f}")
+    col3.metric("Word Count", res['word_count'])
+    col4.metric("Sentences", res['sentence_count'])
+
+    # Verdict Banner
+    if res['ai_prob'] >= sensitivity:
+        st.error(f"🔴 **High Probability AI-Generated** (Exceeds {sensitivity:.0%} sensitivity threshold)")
+    elif res['ai_prob'] >= 0.40:
+        st.warning("🟡 **Mixed Origin / Likely AI-Assisted** (Contains structural edits or hybrid prose)")
+    else:
+        st.success("🟢 **High Probability Human-Written** (Natural sentence variance detected)")
+
+    st.progress(res['ai_prob'])
+
+    # Sentence-Level Highlighting Visual Map
+    st.markdown("### 🔍 Sentence-Level AI Map")
+    st.caption("Hover over highlighted sentences to view individual AI confidence scores.")
+    st.markdown(res["highlighted_html"], unsafe_allow_html=True)
+
+    # Legend
+    col_l1, col_l2, col_l3 = st.columns(3)
+    col_l1.caption("🔴 **Red:** High AI Likelihood (≥65%)")
+    col_l2.caption("🟡 **Yellow:** Moderate / Mixed Signals (35% - 64%)")
+    col_l3.caption("🟢 **Green:** Likely Human-Written (<35%)")
+
+    # Feedback Form Section
+    st.markdown("---")
+    with st.expander("⚠️ Report Inaccurate Result / Log Edge Case"):
+        with st.form("feedback_form", clear_on_submit=True):
+            actual_label = st.radio(
+                "What is the actual origin of this text?",
+                ["Human Written", "AI Generated", "Mixed / Lightly Edited"]
+            )
+            user_notes = st.text_area("Additional context (e.g., non-native writer, academic format):")
+            
+            if st.form_submit_button("Submit Feedback"):
+                success = log_edge_case(
+                    actual_label, 
+                    user_notes, 
+                    res["text"], 
+                    res["ai_prob"], 
+                    res["burstiness_cv"]
+                )
+                if success:
+                    st.success("Logged! Case sent directly to your Discord webhook.")
