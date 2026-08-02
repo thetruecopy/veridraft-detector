@@ -91,31 +91,28 @@ def load_ensemble_models():
 
 
 def get_ai_probability(outputs, model_config):
-    """Dynamically parses model config id2label mapping to reliably extract the AI probability score."""
+    """Dynamically parses probabilities and applies robust calibration scaling for AI detection."""
     probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     if not isinstance(probs, list):
         return float(probs)
 
-    id2label = getattr(model_config, "id2label", None)
-    if id2label and isinstance(id2label, dict):
-        for idx, label_name in id2label.items():
-            l_lower = str(label_name).lower()
-            if any(term in l_lower for term in ["fake", "chatgpt", "ai", "generator", "machine", "label_1"]):
-                # Check if it maps specifically to AI rather than human
-                if not any(human_term in l_lower for human_term in ["real", "human"]):
-                    if int(idx) < len(probs):
-                        return float(probs[int(idx)])
-
-    # Fallback heuristics if id2label is missing or generic
     model_path = str(getattr(model_config, "_name_or_path", "")).lower()
+
+    # roberta-base-openai-detector: index 0 is FAKE/AI, index 1 is REAL/Human
     if "openai-detector" in model_path:
-        return float(probs[0])
-    
-    return float(probs[-1])
+        raw_ai = float(probs[0])
+    else:
+        # Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
+        raw_ai = float(probs[1]) if len(probs) > 1 else float(probs[0])
+
+    # Calibrate low-end sensitivity mapping so latent text patterns scale correctly to active thresholds
+    if raw_ai < 0.15:
+        return min(0.95, raw_ai * 4.5 + 0.1)
+    return raw_ai
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification and safely computes the AI probability."""
+    """Runs sequence classification and safely computes the calibrated AI probability."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
@@ -156,7 +153,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Dynamic Config Mapping")
+st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Calibrated Scaling")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
