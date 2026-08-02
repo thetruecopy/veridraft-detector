@@ -36,7 +36,7 @@ else:
 
 # Title & Subheading
 st.title("📝 Veridraft AI Detector Pro")
-st.caption("Advanced hybrid analysis with global document context and burstiness calibration.")
+st.caption("Advanced hybrid analysis with normalized PDF parsing and calibrated context aware scoring.")
 
 # Input Selection
 input_method = st.radio("Input method:", ["Paste Text", "Upload Document"], horizontal=True)
@@ -56,6 +56,14 @@ else:
             text_input = "\n".join([p.text for p in doc.paragraphs if p.text])
         elif uploaded_file.name.endswith(".txt"):
             text_input = uploaded_file.getvalue().decode("utf-8")
+
+def clean_text(text):
+    """Normalizes PDF/Docx text to match raw text input."""
+    if not text:
+        return ""
+    # Collapse all multi-spaces, newlines, and tabs into standard single spaces
+    cleaned = re.sub(r'\s+', ' ', text)
+    return cleaned.strip()
 
 def split_sentences(text):
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
@@ -85,12 +93,15 @@ def parse_ai_score(res):
         return (1.0 - score) * 100.0
 
 if st.button("Analyze Text") and text_input.strip():
-    sentences = split_sentences(text_input)
+    # Apply text normalization to eliminate format discrepancies
+    normalized_text = clean_text(text_input)
+    sentences = split_sentences(normalized_text)
+    
     if not sentences:
         st.error("Please enter valid text for analysis.")
     else:
-        # 1. Global Document-Level Evaluation (Pass first ~1500 chars to catch macro-patterns)
-        doc_res = detector(text_input[:1500])[0]
+        # 1. Global Document-Level Evaluation
+        doc_res = detector(normalized_text[:1500])[0]
         global_ai_score = parse_ai_score(doc_res)
 
         # 2. Sentence-by-Sentence Evaluation
@@ -120,11 +131,9 @@ if st.button("Analyze Text") and text_input.strip():
         top_k_count = max(1, int(len(scores) * 0.5))
         top_avg = np.mean(scores[:top_k_count]) if scores else 0.0
 
-        # Anchor final risk using the strongest signals (Global Scan, Top Sentences, and Burstiness)
         base_risk = max(global_ai_score, top_avg, avg_ai_confidence)
 
         if "Very Low Variation" in burst_label:
-            # Low burstiness heavily elevates risk floor for AI structural patterns
             final_ai_prob = max(base_risk * 1.35, 88.5 if base_risk > 20 else base_risk * 1.5)
         elif "Low Variation" in burst_label:
             final_ai_prob = max(base_risk, (ai_ratio * 70.0) + (burst_score * 30.0))
