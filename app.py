@@ -22,6 +22,18 @@ if "total_scans" not in st.session_state:
 if "scan_scores" not in st.session_state:
     st.session_state.scan_scores = []
 
+# Sidebar Analytics Panel
+st.sidebar.title("📊 Analytics Dashboard")
+st.sidebar.metric("Total Scans", st.session_state.total_scans)
+
+if st.session_state.scan_scores:
+    avg_score = sum(st.session_state.scan_scores) / len(st.session_state.scan_scores)
+    st.sidebar.metric("Avg AI Risk Score", f"{avg_score:.1f}%")
+    st.sidebar.subheader("Recent Scan Trend")
+    st.sidebar.line_chart(st.session_state.scan_scores)
+else:
+    st.sidebar.info("Run your first analysis to populate session analytics.")
+
 # Title & Subheading
 st.title("📝 Veridraft AI Detector Pro")
 st.caption("Advanced hybrid analysis with normalized PDF parsing and calibrated context aware scoring.")
@@ -145,3 +157,15 @@ if st.button("Analyze Text") and text_input.strip():
             highlighted_html += f'<span style="background-color: {color}; padding: 3px 6px; border-radius: 4px; margin: 3px; display: inline-block; line-height: 1.6;">{s_text}</span> '
 
         st.markdown(f'<div style="line-height: 1.8;">{highlighted_html}</div>', unsafe_allow_html=True)
+
+        # User Feedback Section
+        st.write("---")
+        st.subheader("💬 Detection Feedback")
+        feedback_rating = st.radio(
+            "How accurate was this scan result?",
+            ["Accurate", "Partially Accurate", "Inaccurate"],
+            horizontal=True
+        )
+        feedback_notes = st.text_input("Additional comments or context (optional):")
+        if st.button("Submit Feedback"):
+            st.success("Thank you for your feedback! It helps improve model calibration.")
