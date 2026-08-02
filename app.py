@@ -7,6 +7,13 @@ import requests
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import nltk
+
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab', quiet=True)
+    nltk.download('punkt', quiet=True)
 
 # Guardrail Configuration Constants
 MIN_WORD_COUNT = 15
@@ -89,7 +96,7 @@ def ensemble_ai_predict(text, weight_m1=0.60, weight_m2=0.40):
     return combined_score, score_m1, score_m2
 
 def calculate_burstiness(text):
-    raw_sentences = re.split(r'(?<=[.!?])\s+', text)
+    raw_sentences = nltk.sent_tokenize(text)
     sentences = [s.strip() for s in raw_sentences if s.strip()]
     if len(sentences) <= 1:
         return 0.0, sentences
