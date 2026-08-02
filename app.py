@@ -23,10 +23,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Cache & Load Modern GPT-4 Calibrated Model
+# 2. Cache & Load Verified Model Checkpoint
 @st.cache_resource
 def load_model():
-    model_name = "organika/sdcg-roberta-base-gpt4"
+    model_name = "Hello-SimpleAI/chatgpt-detector-roberta"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(model_name)
     return tokenizer, model
@@ -126,7 +126,7 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
 # 4. Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Model Controls")
-    st.markdown("**Veridraft Engine:** SDCG RoBERTa GPT-4")
+    st.markdown("**Veridraft Engine:** RoBERTa Multi-Window")
     sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.90, 0.50, 0.05)
     st.markdown("---")
     st.markdown("**Metrics Explanation:**")
@@ -167,15 +167,15 @@ if analyze_btn:
     if not user_text.strip():
         st.warning("Please paste text or upload a document first.")
     else:
-        with st.spinner("Executing sliding-window chunking & non-linear burstiness analysis..."):
+        with st.spinner("Executing sliding-window chunking & burstiness analysis..."):
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
             burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # Non-linear probability scaling for low sentence variance (CV < 0.42)
+            # Strong non-linear probability boost for low sentence variance (CV < 0.42)
             calibrated_prob = base_ai_prob
             if burstiness_cv < 0.42:
-                boost_factor = (0.42 - burstiness_cv) * 1.8
-                calibrated_prob = min(0.99, base_ai_prob + boost_factor + 0.25)
+                boost = (0.42 - burstiness_cv) * 2.1
+                calibrated_prob = min(0.98, max(base_ai_prob + 0.35, base_ai_prob + boost + 0.30))
 
             st.session_state["analysis_result"] = {
                 "text": user_text,
