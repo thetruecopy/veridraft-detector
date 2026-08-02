@@ -23,10 +23,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Cache & Load Model
+# 2. Cache & Load Modern GPT-4 Calibrated Model
 @st.cache_resource
 def load_model():
-    model_name = "Hello-SimpleAI/chatgpt-detector-roberta"
+    model_name = "organika/sdcg-roberta-base-gpt4"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(model_name)
     return tokenizer, model
@@ -126,12 +126,12 @@ def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
 # 4. Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Model Controls")
-    st.markdown("**Veridraft Engine:** RoBERTa Sliding-Window")
-    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.90, 0.55, 0.05)
+    st.markdown("**Veridraft Engine:** SDCG RoBERTa GPT-4")
+    sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.90, 0.50, 0.05)
     st.markdown("---")
     st.markdown("**Metrics Explanation:**")
     st.markdown("- **AI Probability:** Multi-window token analysis score.")
-    st.markdown("- **Burstiness (CV):** Sentence length variance (values < 0.40 indicate uniform AI-like rhythm).")
+    st.markdown("- **Burstiness (CV):** Sentence length variance (values < 0.42 indicate uniform AI-like rhythm).")
 
 # 5. Main UI Header & Inputs
 st.title("Veridraft AI Detector Pro 🔍")
@@ -162,19 +162,20 @@ with tab_file:
 
 analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
 
-# 6. Model Execution
+# 6. Model Execution & Calibrated Hybrid Scoring
 if analyze_btn:
     if not user_text.strip():
         st.warning("Please paste text or upload a document first.")
     else:
-        with st.spinner("Executing sliding-window chunking & burstiness analysis..."):
+        with st.spinner("Executing sliding-window chunking & non-linear burstiness analysis..."):
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
             burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # Calibrated Hybrid Weighting for low sentence variance (CV < 0.40)
+            # Non-linear probability scaling for low sentence variance (CV < 0.42)
             calibrated_prob = base_ai_prob
-            if burstiness_cv < 0.40 and base_ai_prob > 0.05:
-                calibrated_prob = min(1.0, base_ai_prob * 1.45)
+            if burstiness_cv < 0.42:
+                boost_factor = (0.42 - burstiness_cv) * 1.8
+                calibrated_prob = min(0.99, base_ai_prob + boost_factor + 0.25)
 
             st.session_state["analysis_result"] = {
                 "text": user_text,
