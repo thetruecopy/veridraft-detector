@@ -95,7 +95,7 @@ def load_ensemble_models():
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification with strict model name checks and raw index mapping."""
+    """Extracts raw classification probabilities with absolute index mapping."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
@@ -104,17 +104,18 @@ def predict_text(text, tok, mod):
     if not isinstance(probs, list):
         return float(probs)
 
-    model_name = getattr(mod.config, "_name_or_path", "").lower()
+    model_path = str(getattr(mod.config, "_name_or_path", "")).lower()
 
-    # 1. roberta-base-openai-detector: Index 0 is Fake (AI), Index 1 is Real (Human)
-    if "roberta-base-openai-detector" in model_name:
-        return probs[0]
+    # For OpenAI's base detector: index 0 is FAKE/AI, index 1 is REAL/Human
+    if "openai-detector" in model_path:
+        return float(probs[0])
     
-    # 2. chatgpt-detector-roberta: Index 0 is Human, Index 1 is ChatGPT (AI)
-    if "chatgpt-detector-roberta" in model_name:
-        return probs[1]
+    # For Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
+    if "chatgpt-detector-roberta" in model_path:
+        return float(probs[1])
 
-    return probs[1]
+    # Default fallback to index 1
+    return float(probs[1])
 
 
 def analyze_document(text, model_pair1, model_pair2):
