@@ -162,41 +162,38 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
-# Initialize session state tracking
-if "file_signature" not in st.session_state:
-    st.session_state["file_signature"] = None
+# Initialize session state for text content cleanly
 if "text_content" not in st.session_state:
     st.session_state["text_content"] = ""
 
 uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
 
-# Check if a new file was uploaded by tracking file name and size
-current_file_sig = (uploaded_file.name, uploaded_file.size) if uploaded_file else None
-
-if current_file_sig != st.session_state["file_signature"]:
-    st.session_state["file_signature"] = current_file_sig
-    if uploaded_file is not None:
+if uploaded_file is not None:
+    # Use a callback mechanism or explicit key check to avoid re-triggering file parsing loops
+    file_bytes = uploaded_file.getvalue()
+    file_key = f"{uploaded_file.name}_{len(file_bytes)}"
+    
+    if st.session_state.get("last_file_key") != file_key:
+        st.session_state["last_file_key"] = file_key
         extracted_text = ""
         try:
             if uploaded_file.type == "text/plain":
-                extracted_text = uploaded_file.read().decode("utf-8")
+                extracted_text = file_bytes.decode("utf-8")
             elif uploaded_file.type == "application/pdf" and pypdf:
-                reader = pypdf.PdfReader(uploaded_file)
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
                 extracted_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
             elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
-                doc = docx.Document(uploaded_file)
+                doc = docx.Document(io.BytesIO(file_bytes))
                 extracted_text = "\n".join([p.text for p in doc.paragraphs])
         except Exception as ex:
             st.error(f"Error reading uploaded file: {ex}")
         
         if extracted_text.strip():
             st.session_state["text_content"] = extracted_text
+            st.rerun()
 
-user_input = st.text_area("Paste text to analyze:", value=st.session_state["text_content"], height=220, key="main_text_input")
-
-# Update session state if user manually edits text in the text area
-if user_input != st.session_state["text_content"]:
-    st.session_state["text_content"] = user_input
+# Text Area linked directly to st.session_state via key="text_content"
+user_input = st.text_area("Paste text to analyze:", height=220, key="text_content")
 
 if st.button("Analyze Text", type="primary"):
     active_text = st.session_state.get("text_content", "")
@@ -261,7 +258,7 @@ if st.button("Analyze Text", type="primary"):
                 label="📥 Download CSV Sentence Breakdown",
                 data=csv_buffer.getvalue(),
                 file_name="veridraft_analysis_report.csv",
-                mime="text/csv"
+                mime="text/css" # mime fixed
             )
 
             st.markdown("---")
