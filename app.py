@@ -79,7 +79,7 @@ def calculate_text_metrics(text, sentences):
     return burstiness, ttr, perplexity_proxy
 
 
-@st.cache_resource
+@st.cache_resource(ttl=1)
 def load_ensemble_models():
     """Loads ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
