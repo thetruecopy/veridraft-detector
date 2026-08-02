@@ -97,11 +97,9 @@ def get_ai_probability(outputs, model_config):
 
     model_path = str(getattr(model_config, "_name_or_path", "")).lower()
 
-    # roberta-base-openai-detector: index 0 is FAKE/AI, index 1 is REAL/Human
     if "openai-detector" in model_path:
         raw_ai = float(probs[0])
     else:
-        # Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
         raw_ai = float(probs[1]) if len(probs) > 1 else float(probs[0])
 
     return float(min(0.99, max(0.96, raw_ai + 0.94)))
@@ -162,50 +160,40 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
-# Initialize session state for text content cleanly
-if "text_content" not in st.session_state:
-    st.session_state["text_content"] = ""
-
+# Clean separation: File uploader and manual text box operate independently
 uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
-
-if uploaded_file is not None:
-    # Use a callback mechanism or explicit key check to avoid re-triggering file parsing loops
-    file_bytes = uploaded_file.getvalue()
-    file_key = f"{uploaded_file.name}_{len(file_bytes)}"
-    
-    if st.session_state.get("last_file_key") != file_key:
-        st.session_state["last_file_key"] = file_key
-        extracted_text = ""
-        try:
-            if uploaded_file.type == "text/plain":
-                extracted_text = file_bytes.decode("utf-8")
-            elif uploaded_file.type == "application/pdf" and pypdf:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                extracted_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
-            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
-                doc = docx.Document(io.BytesIO(file_bytes))
-                extracted_text = "\n".join([p.text for p in doc.paragraphs])
-        except Exception as ex:
-            st.error(f"Error reading uploaded file: {ex}")
-        
-        if extracted_text.strip():
-            st.session_state["text_content"] = extracted_text
-            st.rerun()
-
-# Text Area linked directly to st.session_state via key="text_content"
-user_input = st.text_area("Paste text to analyze:", height=220, key="text_content")
+user_input = st.text_area("Or paste text to analyze:", height=150, placeholder="Paste text here or upload a document above...")
 
 if st.button("Analyze Text", type="primary"):
-    active_text = st.session_state.get("text_content", "")
-    words = active_text.strip().split()
+    target_text = ""
+
+    # 1. Prioritize uploaded file content if a file is present
+    if uploaded_file is not None:
+        try:
+            file_bytes = uploaded_file.getvalue()
+            if uploaded_file.type == "text/plain":
+                target_text = file_bytes.decode("utf-8")
+            elif uploaded_file.type == "application/pdf" and pypdf:
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                target_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
+                doc = docx.Document(io.BytesIO(file_bytes))
+                target_text = "\n".join([p.text for p in doc.paragraphs])
+        except Exception as ex:
+            st.error(f"Error reading uploaded file: {ex}")
+    else:
+        # 2. Fall back to manual text input box if no file is uploaded
+        target_text = user_input
+
+    words = target_text.strip().split()
     
     if len(words) < MIN_WORD_COUNT:
-        st.warning(f"Please enter at least {MIN_WORD_COUNT} words for reliable detection. (Current words: {len(words)})")
+        st.warning(f"Please provide or upload a document containing at least {MIN_WORD_COUNT} words for reliable detection. (Current words: {len(words)})")
     elif len(words) > MAX_WORD_COUNT:
         st.error(f"Text exceeds maximum limit of {MAX_WORD_COUNT} words.")
     else:
         with st.spinner("Evaluating structural signals and running neural ensemble..."):
-            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(active_text, model_pair1, model_pair2)
+            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, model_pair1, model_pair2)
 
         st.markdown("---")
         
@@ -258,7 +246,7 @@ if st.button("Analyze Text", type="primary"):
                 label="📥 Download CSV Sentence Breakdown",
                 data=csv_buffer.getvalue(),
                 file_name="veridraft_analysis_report.csv",
-                mime="text/css" # mime fixed
+                mime="text/csv"
             )
 
             st.markdown("---")
