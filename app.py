@@ -162,43 +162,44 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
-# File uploader comes FIRST so we can read it before building the text area widget
-uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
-
-extracted_text = ""
-if uploaded_file is not None:
-    try:
-        if uploaded_file.type == "text/plain":
-            extracted_text = uploaded_file.read().decode("utf-8")
-        elif uploaded_file.type == "application/pdf" and pypdf:
-            reader = pypdf.PdfReader(uploaded_file)
-            extracted_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
-            doc = docx.Document(uploaded_file)
-            extracted_text = "\n".join([p.text for p in doc.paragraphs])
-    except Exception as ex:
-        st.error(f"Error reading uploaded file: {ex}")
-
-# Use session state to synchronize file content into the text area box properly
-if "last_uploaded_file" not in st.session_state:
-    st.session_state["last_uploaded_file"] = None
+# Initialize session state tracking
+if "file_signature" not in st.session_state:
+    st.session_state["file_signature"] = None
 if "text_content" not in st.session_state:
     st.session_state["text_content"] = ""
 
-if uploaded_file != st.session_state["last_uploaded_file"]:
-    st.session_state["last_uploaded_file"] = uploaded_file
-    if extracted_text.strip():
-        st.session_state["text_content"] = extracted_text
+uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
+
+# Check if a new file was uploaded by tracking file name and size
+current_file_sig = (uploaded_file.name, uploaded_file.size) if uploaded_file else None
+
+if current_file_sig != st.session_state["file_signature"]:
+    st.session_state["file_signature"] = current_file_sig
+    if uploaded_file is not None:
+        extracted_text = ""
+        try:
+            if uploaded_file.type == "text/plain":
+                extracted_text = uploaded_file.read().decode("utf-8")
+            elif uploaded_file.type == "application/pdf" and pypdf:
+                reader = pypdf.PdfReader(uploaded_file)
+                extracted_text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and docx:
+                doc = docx.Document(uploaded_file)
+                extracted_text = "\n".join([p.text for p in doc.paragraphs])
+        except Exception as ex:
+            st.error(f"Error reading uploaded file: {ex}")
+        
+        if extracted_text.strip():
+            st.session_state["text_content"] = extracted_text
 
 user_input = st.text_area("Paste text to analyze:", value=st.session_state["text_content"], height=220, key="main_text_input")
 
-# Keep session state updated if user modifies text manually
-if user_input != st.session_state["text_content"] and not uploaded_file:
+# Update session state if user manually edits text in the text area
+if user_input != st.session_state["text_content"]:
     st.session_state["text_content"] = user_input
 
 if st.button("Analyze Text", type="primary"):
-    # Fallback to current text area content if button is pressed
-    active_text = st.session_state.get("main_text_input", user_input)
+    active_text = st.session_state.get("text_content", "")
     words = active_text.strip().split()
     
     if len(words) < MIN_WORD_COUNT:
