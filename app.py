@@ -1,5 +1,7 @@
 import re
 import time
+import io
+import csv
 import numpy as np
 import requests
 import streamlit as st
@@ -113,6 +115,39 @@ def generate_sentence_highlights(sentences, tokenizer, model):
         highlighted_html += f'<span style="{style}" title="AI Probability: {sentence_score:.1%}">{sentence}</span>'
 
     return f'<div style="line-height: 1.8; font-size: 15px; padding: 15px; background: #fafafa; border-radius: 8px; border: 1px solid #e0e0e0;">{highlighted_html}</div>'
+
+def generate_csv_report(res):
+    """Generates a structured CSV audit file string."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Metric / Property", "Value"])
+    writer.writerow(["Timestamp", time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())])
+    writer.writerow(["AI Probability", f"{res['ai_prob']:.1%}"])
+    writer.writerow(["Burstiness (CV)", f"{res['burstiness_cv']:.3f}"])
+    writer.writerow(["Word Count", res['word_count']])
+    writer.writerow(["Sentence Count", res['sentence_count']])
+    writer.writerow(["Raw Text Sample", res['text'][:300] + "..."])
+    return output.getvalue()
+
+def generate_text_report(res):
+    """Generates a plain-text verification certificate/audit report."""
+    lines = [
+        "==================================================",
+        "     VERIDRAFT AI DETECTOR PRO - AUDIT REPORT     ",
+        "==================================================",
+        f"Timestamp:      {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
+        f"Word Count:     {res['word_count']}",
+        f"Sentences:      {res['sentence_count']}",
+        "--------------------------------------------------",
+        "SCORES & METRICS:",
+        f"• AI Probability: {res['ai_prob']:.1%}",
+        f"• Burstiness (CV): {res['burstiness_cv']:.3f}",
+        "--------------------------------------------------",
+        "TEXT SNIPPET EVALUATED:",
+        f"{res['text'][:400]}...",
+        "=================================================="
+    ]
+    return "\n".join(lines)
 
 def extract_text_from_file(uploaded_file):
     """Extracts raw text from TXT, PDF, or DOCX files."""
@@ -277,6 +312,29 @@ if "analysis_result" in st.session_state:
     col_l1.caption("🔴 **Red:** High AI Likelihood (≥65%)")
     col_l2.caption("🟡 **Yellow:** Moderate / Mixed Signals (35% - 64%)")
     col_l3.caption("🟢 **Green:** Likely Human-Written (<35%)")
+
+    # Export Audit Reports
+    st.markdown("---")
+    st.markdown("### 📥 Export Verification Reports")
+    col_dl1, col_dl2 = st.columns(2)
+    
+    with col_dl1:
+        st.download_button(
+            label="📊 Download CSV Audit Report",
+            data=generate_csv_report(res),
+            file_name=f"veridraft_audit_{int(time.time())}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+    with col_dl2:
+        st.download_button(
+            label="📄 Download Summary Certificate (.txt)",
+            data=generate_text_report(res),
+            file_name=f"veridraft_summary_{int(time.time())}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
 
     # Feedback Form Section
     st.markdown("---")
