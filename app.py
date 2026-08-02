@@ -140,17 +140,19 @@ def extract_text_from_file(uploaded_file):
     return re.sub(r'\s+', ' ', text).strip()
 
 def log_edge_case(actual_label, notes, raw_text, score, cv_metric):
-    """Posts logging payload to Discord via Webhook."""
+    """Posts logging payload to Discord via Webhook cleanly without string parsing errors."""
     webhook_url = st.secrets.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         st.error("Missing DISCORD_WEBHOOK_URL in Streamlit Secrets.")
         return False
     
-    payload = {
-        "content": (
-            f"🚨 **New Edge Case Logged**\n"
-            f"• **Ground Truth:** {actual_label}\n"
-            f"• **Predicted AI Score:** {score:.1%}\n"
-            f"• **Burstiness (CV):** {cv_metric:.3f}\n"
-            f"• **User Notes:** {notes if notes else 'None'}\n"
-            f"• **Text Snippet:** ```{raw_text[:300]}...
+    snippet = raw_text[:300].replace("`", "")
+    note_text = notes if notes else "None"
+    
+    content_text = (
+        f"🚨 **New Edge Case Logged**\n"
+        f"• **Ground Truth:** {actual_label}\n"
+        f"• **Predicted AI Score:** {score:.1%}\n"
+        f"• **Burstiness (CV):** {cv_metric:.3f}\n"
+        f"• **User Notes:** {note_text}\n"
+        f"• **Text Snippet:**\n```\n{snippet}...\n
