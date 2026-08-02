@@ -171,11 +171,11 @@ if analyze_btn:
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
             burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # Strong non-linear probability boost for low sentence variance (CV < 0.42)
+            # Aggressive probability scaling for low sentence variance (CV < 0.42)
             calibrated_prob = base_ai_prob
             if burstiness_cv < 0.42:
-                boost = (0.42 - burstiness_cv) * 2.1
-                calibrated_prob = min(0.98, max(base_ai_prob + 0.35, base_ai_prob + boost + 0.30))
+                cv_delta = 0.42 - burstiness_cv
+                calibrated_prob = min(0.98, max(0.75, base_ai_prob + (cv_delta * 3.0) + 0.50))
 
             st.session_state["analysis_result"] = {
                 "text": user_text,
