@@ -1,6 +1,8 @@
 streamlit
 transformers
 torch
+torchvision
+pandas
+numpy
 pypdf
 python-docx
-pandas
