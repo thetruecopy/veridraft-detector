@@ -40,7 +40,6 @@ def split_into_sentences(text):
     all_sentences = []
 
     for para in paragraphs:
-        # Pre-process quote attributions (e.g. '— Author Next sentence' -> '— Author. Next sentence')
         para_fixed = re.sub(r'([—–-]\s*[A-Z][a-zA-Z\s]+?)(?=\s+[A-Z])', r'\1.', para)
         
         try:
@@ -64,22 +63,19 @@ def calculate_text_metrics(text, sentences):
     if total_words == 0 or len(sentences) == 0:
         return 0.0, 0.0, 0.0
 
-    # Burstiness (Sentence Length Variance)
     lengths = [len(re.findall(r'\b\w+\b', s)) for s in sentences if s]
     mean_len = np.mean(lengths) if lengths else 1
     burstiness = float(np.std(lengths) / mean_len) if mean_len > 0 else 0.0
 
-    # Lexical Diversity / Type-Token Ratio (TTR)
     unique_words = len(set(words))
     ttr = (unique_words / total_words) * 100
 
-    # Estimated Perplexity Proxy
     perplexity_proxy = max(10.0, float(mean_len * (ttr / 10.0) * (1 + burstiness)))
 
     return burstiness, ttr, perplexity_proxy
 
 
-@st.cache_resource(ttl=1)
+@st.cache_resource
 def load_ensemble_models():
     """Loads ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
@@ -94,28 +90,36 @@ def load_ensemble_models():
     return (tok1, mod1), (tok2, mod2)
 
 
-def predict_text(text, tok, mod):
-    """Extracts raw classification probabilities with absolute index mapping."""
-    inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
-    with torch.no_grad():
-        outputs = mod(**inputs)
-        probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
-    
+def get_ai_probability(outputs, model_config):
+    """Dynamically parses model config id2label mapping to reliably extract the AI probability score."""
+    probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     if not isinstance(probs, list):
         return float(probs)
 
-    model_path = str(getattr(mod.config, "_name_or_path", "")).lower()
+    id2label = getattr(model_config, "id2label", None)
+    if id2label and isinstance(id2label, dict):
+        for idx, label_name in id2label.items():
+            l_lower = str(label_name).lower()
+            if any(term in l_lower for term in ["fake", "chatgpt", "ai", "generator", "machine", "label_1"]):
+                # Check if it maps specifically to AI rather than human
+                if not any(human_term in l_lower for human_term in ["real", "human"]):
+                    if int(idx) < len(probs):
+                        return float(probs[int(idx)])
 
-    # For OpenAI's base detector: index 0 is FAKE/AI, index 1 is REAL/Human
+    # Fallback heuristics if id2label is missing or generic
+    model_path = str(getattr(model_config, "_name_or_path", "")).lower()
     if "openai-detector" in model_path:
         return float(probs[0])
     
-    # For Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
-    if "chatgpt-detector-roberta" in model_path:
-        return float(probs[1])
+    return float(probs[-1])
 
-    # Default fallback to index 1
-    return float(probs[1])
+
+def predict_text(text, tok, mod):
+    """Runs sequence classification and safely computes the AI probability."""
+    inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
+    with torch.no_grad():
+        outputs = mod(**inputs)
+        return get_ai_probability(outputs, mod.config)
 
 
 def analyze_document(text, model_pair1, model_pair2):
@@ -152,7 +156,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Attribution Regex")
+st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Dynamic Config Mapping")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -230,7 +234,6 @@ if st.button("Analyze Text", type="primary"):
         with tab3:
             st.subheader("Export Results")
             
-            # Generate CSV string
             csv_buffer = io.StringIO()
             writer = csv.writer(csv_buffer)
             writer.writerow(["Sentence", "AI_Probability_Percent"])
@@ -250,4 +253,3 @@ if st.button("Analyze Text", type="primary"):
             user_notes = st.text_input("Optional notes for training improvement:")
             if st.button("Submit Feedback"):
                 st.success("Thank you for your feedback! This data helps refine future model thresholds.")
-# Force reload version 1.0.1
