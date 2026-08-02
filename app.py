@@ -95,24 +95,28 @@ def load_ensemble_models():
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification and dynamically targets the correct AI/Fake probability label."""
+    """Runs sequence classification with explicit, hardcoded AI label indices per model."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
         probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     
-    # Check model ID2LABEL mapping to dynamically map AI/Fake index
-    id2label = getattr(mod.config, "id2label", {})
-    ai_index = 1  # Default fallback
+    if not isinstance(probs, list):
+        return float(probs)
+
+    # Get model name or path
+    model_name = getattr(mod.config, "_name_or_path", "").lower()
+
+    # roberta-base-openai-detector: Label 0 = Fake (AI), Label 1 = Real (Human)
+    if "roberta-base-openai-detector" in model_name:
+        return probs[0]
     
-    for idx, label in id2label.items():
-        if any(term in str(label).lower() for term in ["fake", "gpt", "ai", "chatgpt"]):
-            ai_index = int(idx)
-            break
-            
-    if isinstance(probs, list):
-        return probs[ai_index] if len(probs) > ai_index else probs[0]
-    return float(probs)
+    # Hello-SimpleAI/chatgpt-detector-roberta: Label 0 = Human, Label 1 = ChatGPT (AI)
+    if "chatgpt-detector-roberta" in model_name:
+        return probs[1]
+
+    # Fallback for generic detectors
+    return probs[1]
 
 
 def analyze_document(text, model_pair1, model_pair2):
