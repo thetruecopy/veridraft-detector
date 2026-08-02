@@ -36,7 +36,7 @@ else:
 
 # Title & Subheading
 st.title("📝 Veridraft AI Detector Pro")
-st.caption("Advanced hybrid analysis with normalized PDF parsing and calibrated context aware scoring.")
+st.caption("Advanced hybrid analysis with global document context and burstiness calibration.")
 
 # Input Selection
 input_method = st.radio("Input method:", ["Paste Text", "Upload Document"], horizontal=True)
@@ -68,19 +68,32 @@ def calculate_burstiness(sentence_lengths):
     mean_len = np.mean(sentence_lengths)
     cv = std_dev / mean_len if mean_len > 0 else 0
     if cv < 0.35:
-        return "Very Low Variation (Strong AI Signal)", 0.9
+        return "Very Low Variation (Strong AI Signal)", 0.95
     elif cv < 0.55:
-        return "Low Variation", 0.6
+        return "Low Variation", 0.70
     elif cv < 0.85:
-        return "Moderate Variation", 0.4
+        return "Moderate Variation", 0.40
     else:
-        return "High Variation (Human-like)", 0.1
+        return "High Variation (Human-like)", 0.10
+
+def parse_ai_score(res):
+    label = res["label"].lower()
+    score = res["score"]
+    if any(k in label for k in ["chatgpt", "fake", "ai", "label_1"]):
+        return score * 100.0
+    else:
+        return (1.0 - score) * 100.0
 
 if st.button("Analyze Text") and text_input.strip():
     sentences = split_sentences(text_input)
     if not sentences:
         st.error("Please enter valid text for analysis.")
     else:
+        # 1. Global Document-Level Evaluation (Pass first ~1500 chars to catch macro-patterns)
+        doc_res = detector(text_input[:1500])[0]
+        global_ai_score = parse_ai_score(doc_res)
+
+        # 2. Sentence-by-Sentence Evaluation
         sentence_details = []
         sentence_lengths = [len(s.split()) for s in sentences]
         
@@ -89,13 +102,7 @@ if st.button("Analyze Text") and text_input.strip():
 
         for sentence in sentences:
             res = detector(sentence[:512])[0]
-            label = res["label"].lower()
-            score = res["score"]
-            
-            if "chatgpt" in label or "fake" in label or "ai" in label:
-                ai_score = score * 100.0
-            else:
-                ai_score = (1.0 - score) * 100.0
+            ai_score = parse_ai_score(res)
             
             if ai_score >= 50.0:
                 ai_count += 1
@@ -107,22 +114,22 @@ if st.button("Analyze Text") and text_input.strip():
         avg_ai_confidence = total_confidence / len(sentences)
         burst_label, burst_score = calculate_burstiness(sentence_lengths)
 
-        # Calibrated Top-K & Burstiness Weighted Score Calibration
+        # 3. Hybrid Calibration Logic
         scores = [item["score"] for item in sentence_details]
         scores.sort(reverse=True)
-        top_k_count = max(1, int(len(scores) * 0.6))
+        top_k_count = max(1, int(len(scores) * 0.5))
         top_avg = np.mean(scores[:top_k_count]) if scores else 0.0
 
-        if ai_ratio >= 0.60:
-            base_risk = max(ai_ratio * 100.0, avg_ai_confidence)
-            final_ai_prob = base_risk + (100.0 - base_risk) * 0.45
-        elif ai_ratio >= 0.30:
-            final_ai_prob = max(top_avg, (ai_ratio * 80.0) + (burst_score * 20.0))
-        else:
-            final_ai_prob = top_avg
+        # Anchor final risk using the strongest signals (Global Scan, Top Sentences, and Burstiness)
+        base_risk = max(global_ai_score, top_avg, avg_ai_confidence)
 
-        if "Very Low" in str(burst_label):
-            final_ai_prob = min(98.5, final_ai_prob * 1.35)
+        if "Very Low Variation" in burst_label:
+            # Low burstiness heavily elevates risk floor for AI structural patterns
+            final_ai_prob = max(base_risk * 1.35, 88.5 if base_risk > 20 else base_risk * 1.5)
+        elif "Low Variation" in burst_label:
+            final_ai_prob = max(base_risk, (ai_ratio * 70.0) + (burst_score * 30.0))
+        else:
+            final_ai_prob = base_risk
 
         final_ai_prob = min(99.4, max(0.5, final_ai_prob))
         final_human_prob = 100.0 - final_ai_prob
@@ -142,15 +149,15 @@ if st.button("Analyze Text") and text_input.strip():
 
         # Highlighted Sentence Breakdown
         st.subheader("🔍 Sentence-by-Sentence Breakdown")
-        st.caption("Sentences are individually evaluated with contextual windowing. Red/Orange highlights indicate elevated AI confidence.")
+        st.caption("Sentences are individually evaluated. Red/Orange highlights indicate elevated AI confidence.")
 
         highlighted_html = ""
         for item in sentence_details:
             s_text = item["sentence"]
             s_score = item["score"]
-            if s_score >= 70:
+            if s_score >= 65 or final_ai_prob > 80:
                 color = "rgba(255, 99, 71, 0.3)"  # Light Red
-            elif s_score >= 45:
+            elif s_score >= 40:
                 color = "rgba(255, 165, 0, 0.3)"  # Light Orange
             else:
                 color = "rgba(144, 238, 144, 0.3)" # Light Green
