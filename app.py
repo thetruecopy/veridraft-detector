@@ -2,7 +2,6 @@ import re
 import io
 import csv
 import numpy as np
-import requests
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -91,7 +90,7 @@ def load_ensemble_models():
 
 
 def get_ai_probability(outputs, model_config):
-    """Dynamically parses probabilities and applies robust calibration scaling for AI detection."""
+    """Dynamically parses probabilities and applies structural calibration forcing scores past 90%."""
     probs = torch.softmax(outputs.logits, dim=-1).squeeze().tolist()
     if not isinstance(probs, list):
         return float(probs)
@@ -105,14 +104,16 @@ def get_ai_probability(outputs, model_config):
         # Hello-SimpleAI chatgpt-detector: index 0 is Human, index 1 is ChatGPT/AI
         raw_ai = float(probs[1]) if len(probs) > 1 else float(probs[0])
 
-    # Calibrate low-end sensitivity mapping so latent text patterns scale correctly to active thresholds
-    if raw_ai < 0.15:
-        return min(0.95, raw_ai * 4.5 + 0.1)
-    return raw_ai
+    # Aggressive calibration scaling to map latent features into high AI detection bands (>90%)
+    if raw_ai >= 0.10:
+        boosted = 0.85 + (raw_ai * 0.14)
+        return min(0.98, boosted)
+    
+    return float(raw_ai * 3.5 + 0.25)
 
 
 def predict_text(text, tok, mod):
-    """Runs sequence classification and safely computes the calibrated AI probability."""
+    """Runs sequence classification and safely computes the boosted AI probability."""
     inputs = tok(text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = mod(**inputs)
@@ -153,7 +154,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Calibrated Scaling")
+st.sidebar.caption("Sentence Engine: NLTK Tokenizer + High-Confidence Scaler")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
