@@ -1,9 +1,15 @@
 import re
+import time
 import numpy as np
 import requests
 import streamlit as st
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+# Guardrail Configuration Constants
+MIN_WORD_COUNT = 15
+MAX_WORD_COUNT = 5000
+COOLDOWN_SECONDS = 4
 
 # Optional imports for document processing
 try:
@@ -22,6 +28,10 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide"
 )
+
+# Initialize Session Rate Limiting Tracking
+if "last_request_time" not in st.session_state:
+    st.session_state["last_request_time"] = 0.0
 
 # 2. Cache & Load Verified Model Checkpoint
 @st.cache_resource
@@ -129,9 +139,9 @@ with st.sidebar:
     st.markdown("**Veridraft Engine:** RoBERTa Multi-Window")
     sensitivity = st.slider("Detection Sensitivity Threshold", 0.30, 0.95, 0.70, 0.05)
     st.markdown("---")
-    st.markdown("**Metrics Explanation:**")
-    st.markdown("- **AI Probability:** Multi-window token analysis score.")
-    st.markdown("- **Burstiness (CV):** Sentence length variance (values < 0.42 indicate uniform AI-like rhythm).")
+    st.markdown("**Guardrails Active:**")
+    st.caption(f"• Word Limits: {MIN_WORD_COUNT} – {MAX_WORD_COUNT:,} words")
+    st.caption(f"• Request Cooldown: {COOLDOWN_SECONDS} seconds")
 
 # 5. Main UI Header & Inputs
 st.title("Veridraft AI Detector Pro 🔍")
@@ -162,16 +172,35 @@ with tab_file:
 
 analyze_btn = st.button("Run Hybrid Analysis", type="primary", use_container_width=True)
 
-# 6. Model Execution & High-Precision Hybrid Calibration
+# 6. Model Execution & Input Guardrails Validation
 if analyze_btn:
+    words = len(user_text.split())
+    current_time = time.time()
+    elapsed_time = current_time - st.session_state["last_request_time"]
+
+    # Guardrail Check 1: Empty or short input
     if not user_text.strip():
         st.warning("Please paste text or upload a document first.")
+    elif words < MIN_WORD_COUNT:
+        st.warning(f"⚠️ Text too short for statistical analysis ({words} words detected). Minimum required is {MIN_WORD_COUNT} words.")
+    
+    # Guardrail Check 2: Memory protection limit
+    elif words > MAX_WORD_COUNT:
+        st.error(f"🛑 Text size exceeds the safety limit ({words:,} words). Maximum supported limit is {MAX_WORD_COUNT:,} words per run.")
+    
+    # Guardrail Check 3: Rate limit / request throttling
+    elif elapsed_time < COOLDOWN_SECONDS:
+        remaining = int(COOLDOWN_SECONDS - elapsed_time) + 1
+        st.warning(f"⏳ Rate limit active. Please wait {remaining} second(s) before running another analysis.")
+        
     else:
+        st.session_state["last_request_time"] = current_time
+        
         with st.spinner("Executing sliding-window chunking & burstiness analysis..."):
             base_ai_prob = chunked_ai_predict(user_text, tokenizer, model)
             burstiness_cv, sentences = calculate_burstiness(user_text)
 
-            # High-precision scaling for low sentence variance (CV < 0.42) targeting 98%-99%
+            # High-precision scaling for low sentence variance (CV < 0.42)
             calibrated_prob = base_ai_prob
             if burstiness_cv < 0.42:
                 cv_delta = 0.42 - burstiness_cv
@@ -182,7 +211,7 @@ if analyze_btn:
                 "ai_prob": calibrated_prob,
                 "burstiness_cv": burstiness_cv,
                 "sentence_count": len(sentences),
-                "word_count": len(user_text.split())
+                "word_count": words
             }
 
 # 7. Render Full Results Dashboard
