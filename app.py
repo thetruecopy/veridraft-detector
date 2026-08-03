@@ -365,7 +365,7 @@ if st.button("Analyze Text", type="primary"):
             st.subheader("Report False Detection")
             feedback_type = st.radio("Was this classification accurate?", ["Accurate", "False Positive (Human marked as AI)", "False Negative (AI marked as Human)"])
             user_notes = st.text_input("Optional notes for training improvement:")
-           if st.button("Submit Feedback"):
+            if st.button("Submit Feedback"):
             try:
                 response = supabase.table("edge_cases").insert({
                     "actual_label": feedback_type,
