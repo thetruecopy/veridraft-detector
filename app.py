@@ -178,30 +178,27 @@ def predict_text(text, tok, mod):
         return get_ai_probability(outputs, mod.config)
 
 
-def analyze_document(text, model_pair1, model_pair2):
-    """Calculates overall AI likelihood and sentence-level scores using chunked processing and evasion checks."""
-    (tok1, mod1), (tok2, mod2) = model_pair1, model_pair2
+def analyze_document(text, model_pairs):
+    """Calculates overall AI likelihood and sentence-level scores using ensemble multilingual chunked processing."""
+    (tok1, mod1), (tok2, mod2), (tok3, mod3) = model_pairs
 
     sentences = split_into_sentences(text)
     burstiness, ttr, perplexity = calculate_text_metrics(text, sentences)
 
-    # 1. Break sentences into manageable chunks (max 400 words per chunk)
     chunks = chunk_text_by_sentences(sentences, max_words_per_chunk=400)
 
-    # 2. Score each chunk globally and average them out
     chunk_scores = []
     for chunk in chunks:
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
-        chunk_scores.append((p1 + p2) / 2.0)
+        p3 = predict_text(chunk, tok3, mod3)
+        chunk_scores.append((p1 + p2 + p3) / 3.0)
     
     base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
 
-    # 3. Apply evasion resilience heuristics for humanized text
     evasion_adjustment = check_evasion_heuristics(text, ttr, burstiness)
     global_ai_prob = float(min(0.99, max(0.05, base_ai_prob + evasion_adjustment)))
 
-    # 4. Score sentence by sentence for the sentence map
     sentence_data = []
     for s in sentences:
         if len(s.split()) < 3:
@@ -209,8 +206,8 @@ def analyze_document(text, model_pair1, model_pair2):
             continue
         p1 = predict_text(s, tok1, mod1)
         p2 = predict_text(s, tok2, mod2)
-        avg_p = (p1 + p2) / 2.0
-        # Incorporate minor proportional adjustment for sentence-level display if evasion is triggered
+        p3 = predict_text(s, tok3, mod3)
+        avg_p = (p1 + p2 + p3) / 3.0
         sentence_data.append((s, float(min(0.99, max(0.05, avg_p + evasion_adjustment)))))
 
     return global_ai_prob, burstiness, ttr, perplexity, sentence_data
