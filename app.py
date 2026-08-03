@@ -365,8 +365,19 @@ if st.button("Analyze Text", type="primary"):
             st.subheader("Report False Detection")
             feedback_type = st.radio("Was this classification accurate?", ["Accurate", "False Positive (Human marked as AI)", "False Negative (AI marked as Human)"])
             user_notes = st.text_input("Optional notes for training improvement:")
-            if st.button("Submit Feedback"):
-                st.success("Thank you for your feedback! This data helps refine future model thresholds.")
+           if st.button("Submit Feedback"):
+            try:
+                response = supabase.table("edge_cases").insert({
+                    "actual_label": feedback_type,
+                    "predicted_score": float(ai_prob),
+                    "burstiness_cv": float(burstiness),
+                    "user_notes": user_notes,
+                    "text_snippet": target_text[:500]
+                }).execute()
+                
+                st.success("Thank you for your feedback! Data successfully logged to Supabase.")
+            except Exception as e:
+                st.error(f"Failed to log data to Supabase: {e}")
 
         if show_api_tab:
             with tab4:
