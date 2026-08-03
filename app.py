@@ -37,13 +37,9 @@ def normalize_extracted_text(text):
     """Normalizes whitespace, line breaks, and invisible PDF artifacts to guarantee 100% parity with pasted text."""
     if not text:
         return ""
-    # Replace non-breaking spaces, zero-width characters, and formatting artifacts common in PDFs
     text = text.replace('\xa0', ' ').replace('\u200b', '')
-    # Normalize carriage returns and multiple line spaces into standardized clean spacing
     text = re.sub(r'\r\n?', '\n', text)
-    # Collapse broken hyphenations across line breaks (e.g., "exam-\nple" -> "example")
     text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
-    # Standardize paragraph spacing
     lines = [line.strip() for line in text.split('\n')]
     cleaned_lines = [line for line in lines if line]
     return " ".join(cleaned_lines)
@@ -68,6 +64,29 @@ def split_into_sentences(text):
                 all_sentences.append(cleaned)
 
     return all_sentences
+
+
+def chunk_text_by_sentences(sentences, max_words_per_chunk=400):
+    """Groups sentences into chunks that stay under the model's word/token limit."""
+    chunks = []
+    current_chunk = []
+    current_word_count = 0
+
+    for sentence in sentences:
+        words_in_sent = len(sentence.split())
+        
+        if current_word_count + words_in_sent > max_words_per_chunk and current_chunk:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [sentence]
+            current_word_count = words_in_sent
+        else:
+            current_chunk.append(sentence)
+            current_word_count += words_in_sent
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return chunks
 
 
 def calculate_text_metrics(text, sentences):
@@ -182,7 +201,6 @@ user_input = st.text_area("Or paste text to analyze:", height=150, placeholder="
 if st.button("Analyze Text", type="primary"):
     target_text = ""
 
-    # 1. Prioritize uploaded file content and apply robust text normalization
     if uploaded_file is not None:
         try:
             file_bytes = uploaded_file.getvalue()
@@ -196,12 +214,10 @@ if st.button("Analyze Text", type="primary"):
                 doc = docx.Document(io.BytesIO(file_bytes))
                 raw_extracted = "\n".join([p.text for p in doc.paragraphs])
             
-            # Normalize to guarantee exact parity with manual pasting behavior
             target_text = normalize_extracted_text(raw_extracted)
         except Exception as ex:
             st.error(f"Error reading uploaded file: {ex}")
     else:
-        # 2. Fall back to manual text input box if no file is uploaded
         target_text = normalize_extracted_text(user_input)
 
     words = target_text.strip().split()
