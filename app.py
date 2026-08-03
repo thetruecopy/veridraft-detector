@@ -139,8 +139,7 @@ def load_ensemble_models():
     """Loads ensemble classifiers and multilingual detection models into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
-    # Lightweight multilingual model capable of detecting cross-lingual AI generation
-    m3_name = "xlm-roberta-base-finetuned-panx-de" # Or standard multilingual model fallback
+    m3_name = "xlm-roberta-base"
 
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
@@ -148,8 +147,9 @@ def load_ensemble_models():
     tok2 = AutoTokenizer.from_pretrained(m2_name)
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
 
-    tok3 = AutoTokenizer.from_pretrained("cardiffnlp/twitter-xlm-roberta-base-sentiment")
-    mod3 = AutoModelForSequenceClassification.from_pretrained("cardiffnlp/twitter-xlm-roberta-base-sentiment")
+    tok3 = AutoTokenizer.from_pretrained(m3_name)
+    # Using dummy classification head fallback or standard config loader
+    mod3 = AutoModelForSequenceClassification.from_pretrained(m3_name, num_labels=2)
 
     return (tok1, mod1), (tok2, mod2), (tok3, mod3)
 
