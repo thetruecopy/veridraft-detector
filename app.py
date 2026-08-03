@@ -376,7 +376,7 @@ if st.button("Analyze Text", type="primary"):
                 }).execute()
                 
                 st.success("Thank you for your feedback! Data successfully logged to Supabase.")
-            except Exception as e:
+             except Exception as e:
                 st.error(f"Failed to log data to Supabase: {e}")
 
         if show_api_tab:
