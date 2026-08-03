@@ -93,7 +93,6 @@ def check_evasion_heuristics(text, ttr, burstiness):
     """Detects common AI 'humanizer' patterns and artificial synonym stuffing."""
     text_lower = text.lower()
     
-    # Common hollow transition phrases heavily overused by humanizers
     filler_phrases = [
         "delving into", "it is important to note", "furthermore, it is", 
         "in conclusion, as", "sheds light on", "testament to", 
@@ -102,12 +101,10 @@ def check_evasion_heuristics(text, ttr, burstiness):
     
     filler_count = sum(text_lower.count(phrase) for phrase in filler_phrases)
     
-    # Penalty calculation based on artificial fillers and unnaturally low burstiness
     evasion_penalty = 0.0
     if filler_count >= 2:
         evasion_penalty += 0.15 * min(filler_count, 4)
     
-    # If burstiness is suspiciously low despite high vocabulary variation (TTR)
     if burstiness < 0.25 and ttr > 55.0:
         evasion_penalty += 0.20
 
@@ -136,7 +133,7 @@ def calculate_text_metrics(text, sentences):
 
 @st.cache_resource
 def load_ensemble_models():
-    """Loads ensemble classifiers and multilingual detection models into memory."""
+    """Loads English and Multilingual ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
     m3_name = "xlm-roberta-base"
@@ -148,7 +145,6 @@ def load_ensemble_models():
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
 
     tok3 = AutoTokenizer.from_pretrained(m3_name)
-    # Using dummy classification head fallback or standard config loader
     mod3 = AutoModelForSequenceClassification.from_pretrained(m3_name, num_labels=2)
 
     return (tok1, mod1), (tok2, mod2), (tok3, mod3)
@@ -179,7 +175,7 @@ def predict_text(text, tok, mod):
 
 
 def analyze_document(text, model_pairs):
-    """Calculates overall AI likelihood and sentence-level scores using ensemble multilingual chunked processing."""
+    """Calculates overall AI likelihood and sentence-level scores using multilingual ensemble chunked processing."""
     (tok1, mod1), (tok2, mod2), (tok3, mod3) = model_pairs
 
     sentences = split_into_sentences(text)
@@ -222,16 +218,16 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
-st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Engine: Chunked Processing + Humanizer Evasion Shield")
+st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
+st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
 st.markdown("Analyze documents for AI content, sentence variation, lexical density, and line-by-line confidence maps.")
 
 try:
-    with st.spinner("Initializing models..."):
-        model_pair1, model_pair2 = load_ensemble_models()
+    with st.spinner("Initializing multilingual models..."):
+        model_pair1, model_pair2, model_pair3 = load_ensemble_models()
 except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
@@ -268,8 +264,10 @@ if st.button("Analyze Text", type="primary"):
     elif len(words) > MAX_WORD_COUNT:
         st.error(f"Text exceeds maximum limit of {MAX_WORD_COUNT} words.")
     else:
-        with st.spinner("Evaluating structural signals and running neural ensemble..."):
-            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, model_pair1, model_pair2)
+        with st.spinner("Evaluating structural signals and running multilingual ensemble..."):
+            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(
+                target_text, (model_pair1, model_pair2, model_pair3)
+            )
 
         st.markdown("---")
         
