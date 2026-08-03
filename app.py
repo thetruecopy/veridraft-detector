@@ -89,6 +89,31 @@ def chunk_text_by_sentences(sentences, max_words_per_chunk=400):
     return chunks
 
 
+def check_evasion_heuristics(text, ttr, burstiness):
+    """Detects common AI 'humanizer' patterns and artificial synonym stuffing."""
+    text_lower = text.lower()
+    
+    # Common hollow transition phrases heavily overused by humanizers
+    filler_phrases = [
+        "delving into", "it is important to note", "furthermore, it is", 
+        "in conclusion, as", "sheds light on", "testament to", 
+        "beacon of", "navigating the landscape", "in order to effectively"
+    ]
+    
+    filler_count = sum(text_lower.count(phrase) for phrase in filler_phrases)
+    
+    # Penalty calculation based on artificial fillers and unnaturally low burstiness
+    evasion_penalty = 0.0
+    if filler_count >= 2:
+        evasion_penalty += 0.15 * min(filler_count, 4)
+    
+    # If burstiness is suspiciously low despite high vocabulary variation (TTR)
+    if burstiness < 0.25 and ttr > 55.0:
+        evasion_penalty += 0.20
+
+    return float(min(0.35, evasion_penalty))
+
+
 def calculate_text_metrics(text, sentences):
     """Calculates burstiness, type-token ratio (lexical diversity), and standard readability proxies."""
     words = [w.lower() for w in re.findall(r'\b\w+\b', text)]
@@ -149,7 +174,7 @@ def predict_text(text, tok, mod):
 
 
 def analyze_document(text, model_pair1, model_pair2):
-    """Calculates overall AI likelihood and sentence-level scores using chunked text processing."""
+    """Calculates overall AI likelihood and sentence-level scores using chunked processing and evasion checks."""
     (tok1, mod1), (tok2, mod2) = model_pair1, model_pair2
 
     sentences = split_into_sentences(text)
@@ -158,16 +183,20 @@ def analyze_document(text, model_pair1, model_pair2):
     # 1. Break sentences into manageable chunks (max 400 words per chunk)
     chunks = chunk_text_by_sentences(sentences, max_words_per_chunk=400)
 
-    # 2. Score each chunk globally and average them out for the global AI score
+    # 2. Score each chunk globally and average them out
     chunk_scores = []
     for chunk in chunks:
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
         chunk_scores.append((p1 + p2) / 2.0)
     
-    global_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
+    base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
 
-    # 3. Score sentence by sentence for the sentence map
+    # 3. Apply evasion resilience heuristics for humanized text
+    evasion_adjustment = check_evasion_heuristics(text, ttr, burstiness)
+    global_ai_prob = float(min(0.99, max(0.05, base_ai_prob + evasion_adjustment)))
+
+    # 4. Score sentence by sentence for the sentence map
     sentence_data = []
     for s in sentences:
         if len(s.split()) < 3:
@@ -176,7 +205,8 @@ def analyze_document(text, model_pair1, model_pair2):
         p1 = predict_text(s, tok1, mod1)
         p2 = predict_text(s, tok2, mod2)
         avg_p = (p1 + p2) / 2.0
-        sentence_data.append((s, avg_p))
+        # Incorporate minor proportional adjustment for sentence-level display if evasion is triggered
+        sentence_data.append((s, float(min(0.99, max(0.05, avg_p + evasion_adjustment)))))
 
     return global_ai_prob, burstiness, ttr, perplexity, sentence_data
 
@@ -191,7 +221,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa-Base OpenAI + ChatGPT Detector")
-st.sidebar.caption("Sentence Engine: NLTK Tokenizer + Unified Normalizer")
+st.sidebar.caption("Engine: Chunked Processing + Humanizer Evasion Shield")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
