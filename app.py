@@ -209,6 +209,38 @@ def analyze_document(text, model_pairs):
     return global_ai_prob, burstiness, ttr, perplexity, sentence_data
 
 
+def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_threshold=0.35):
+    """Programmatic API endpoint function for external integrations and automated pipelines."""
+    cleaned_text = normalize_extracted_text(text)
+    words = cleaned_text.strip().split()
+    
+    if len(words) < MIN_WORD_COUNT:
+        return {"error": f"Text too short. Minimum required words: {MIN_WORD_COUNT}"}
+    if len(words) > MAX_WORD_COUNT:
+        return {"error": f"Text exceeds maximum limit of {MAX_WORD_COUNT} words."}
+
+    ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(cleaned_text, model_pairs)
+    
+    if ai_prob >= high_threshold:
+        classification = "High Probability of AI Generation"
+    elif ai_prob >= low_threshold:
+        classification = "Mixed Signals Detected"
+    else:
+        classification = "Likely Human-Written"
+
+    return {
+        "overall_ai_score_percent": round(ai_prob * 100, 2),
+        "classification": classification,
+        "metrics": {
+            "burstiness": round(burstiness, 2),
+            "perplexity": round(perplexity, 1),
+            "lexical_diversity_ttr_percent": round(ttr, 2)
+        },
+        "sentence_count": len(sentence_data),
+        "sentences": [{"sentence": s, "ai_score_percent": round(score * 100, 2)} for s, score in sentence_data]
+    }
+
+
 # --- Page Configuration & Sidebar ---
 st.set_page_config(page_title="Veridraft AI Detector Pro", page_icon="🔍", layout="wide")
 
@@ -219,7 +251,7 @@ low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 1
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
-st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield")
+st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -228,6 +260,7 @@ st.markdown("Analyze documents for AI content, sentence variation, lexical densi
 try:
     with st.spinner("Initializing multilingual models..."):
         model_pair1, model_pair2, model_pair3 = load_ensemble_models()
+        active_models = (model_pair1, model_pair2, model_pair3)
 except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
@@ -265,13 +298,11 @@ if st.button("Analyze Text", type="primary"):
         st.error(f"Text exceeds maximum limit of {MAX_WORD_COUNT} words.")
     else:
         with st.spinner("Evaluating structural signals and running multilingual ensemble..."):
-            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(
-                target_text, (model_pair1, model_pair2, model_pair3)
-            )
+            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, active_models)
 
         st.markdown("---")
         
-        tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
 
         with tab1:
             col1, col2, col3, col4 = st.columns(4)
@@ -329,3 +360,31 @@ if st.button("Analyze Text", type="primary"):
             user_notes = st.text_input("Optional notes for training improvement:")
             if st.button("Submit Feedback"):
                 st.success("Thank you for your feedback! This data helps refine future model thresholds.")
+
+        with tab4:
+            st.subheader("Enterprise API Integration")
+            st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
+            
+            api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
+            
+            st.markdown("#### Sample JSON API Response for Current Text:")
+            st.json(api_payload)
+
+            st.markdown("#### FastAPI Server Implementation Snippet:")
+            st.code("""
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+# Import your analyzer function and loaded models here
+
+app = FastAPI()
+
+class AnalysisRequest(BaseModel):
+    text: str
+
+@app.post("/api/v1/analyze")
+def analyze_endpoint(payload: AnalysisRequest):
+    result = programmatic_analyze_text(payload.text, active_models)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+            """, language="python")
