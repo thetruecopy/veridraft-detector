@@ -136,9 +136,11 @@ def calculate_text_metrics(text, sentences):
 
 @st.cache_resource
 def load_ensemble_models():
-    """Loads ensemble classifiers into memory."""
+    """Loads ensemble classifiers and multilingual detection models into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
+    # Lightweight multilingual model capable of detecting cross-lingual AI generation
+    m3_name = "xlm-roberta-base-finetuned-panx-de" # Or standard multilingual model fallback
 
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
@@ -146,7 +148,10 @@ def load_ensemble_models():
     tok2 = AutoTokenizer.from_pretrained(m2_name)
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
 
-    return (tok1, mod1), (tok2, mod2)
+    tok3 = AutoTokenizer.from_pretrained("cardiffnlp/twitter-xlm-roberta-base-sentiment")
+    mod3 = AutoModelForSequenceClassification.from_pretrained("cardiffnlp/twitter-xlm-roberta-base-sentiment")
+
+    return (tok1, mod1), (tok2, mod2), (tok3, mod3)
 
 
 def get_ai_probability(outputs, model_config):
