@@ -149,16 +149,25 @@ def predict_text(text, tok, mod):
 
 
 def analyze_document(text, model_pair1, model_pair2):
-    """Calculates overall AI likelihood and sentence-level scores."""
+    """Calculates overall AI likelihood and sentence-level scores using chunked text processing."""
     (tok1, mod1), (tok2, mod2) = model_pair1, model_pair2
 
     sentences = split_into_sentences(text)
     burstiness, ttr, perplexity = calculate_text_metrics(text, sentences)
 
-    global_p1 = predict_text(text, tok1, mod1)
-    global_p2 = predict_text(text, tok2, mod2)
-    global_ai_prob = (global_p1 + global_p2) / 2.0
+    # 1. Break sentences into manageable chunks (max 400 words per chunk)
+    chunks = chunk_text_by_sentences(sentences, max_words_per_chunk=400)
 
+    # 2. Score each chunk globally and average them out for the global AI score
+    chunk_scores = []
+    for chunk in chunks:
+        p1 = predict_text(chunk, tok1, mod1)
+        p2 = predict_text(chunk, tok2, mod2)
+        chunk_scores.append((p1 + p2) / 2.0)
+    
+    global_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
+
+    # 3. Score sentence by sentence for the sentence map
     sentence_data = []
     for s in sentences:
         if len(s.split()) < 3:
