@@ -249,6 +249,10 @@ high_threshold = st.sidebar.slider("High AI Likelihood Cutoff (%)", 50, 90, 65) 
 low_threshold = st.sidebar.slider("Human Likelihood Cutoff (%)", 10, 49, 35) / 100.0
 
 st.sidebar.markdown("---")
+st.sidebar.subheader("🔒 Developer Access")
+show_api_tab = st.sidebar.checkbox("Enable Developer / API View", value=False)
+
+st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
 st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
@@ -302,7 +306,10 @@ if st.button("Analyze Text", type="primary"):
 
         st.markdown("---")
         
-        tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
+        if show_api_tab:
+            tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
+        else:
+            tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
 
         with tab1:
             col1, col2, col3, col4 = st.columns(4)
@@ -361,17 +368,18 @@ if st.button("Analyze Text", type="primary"):
             if st.button("Submit Feedback"):
                 st.success("Thank you for your feedback! This data helps refine future model thresholds.")
 
-        with tab4:
-            st.subheader("Enterprise API Integration")
-            st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
-            
-            api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
-            
-            st.markdown("#### Sample JSON API Response for Current Text:")
-            st.json(api_payload)
+        if show_api_tab:
+            with tab4:
+                st.subheader("Enterprise API Integration")
+                st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
+                
+                api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
+                
+                st.markdown("#### Sample JSON API Response for Current Text:")
+                st.json(api_payload)
 
-            st.markdown("#### FastAPI Server Implementation Snippet:")
-            st.code("""
+                st.markdown("#### FastAPI Server Implementation Snippet:")
+                st.code("""
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Import your analyzer function and loaded models here
@@ -387,4 +395,4 @@ def analyze_endpoint(payload: AnalysisRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-            """, language="python")
+                """, language="python")
