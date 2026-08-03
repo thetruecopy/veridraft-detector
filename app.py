@@ -396,10 +396,13 @@ def analyze_endpoint(payload: AnalysisRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
                 """, language="python")
-# --- Supabase Test Connection ---
-try:
+# --- Initialize Supabase Client ---
+from supabase import create_client
+
+@st.cache_resource
+def init_supabase():
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
-    st.sidebar.success("Supabase secrets loaded successfully!")
-except Exception as e:
-    st.sidebar.error(f"Could not load secrets: {e}")
+    return create_client(url, key)
+
+supabase = init_supabase()
