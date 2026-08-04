@@ -381,16 +381,16 @@ if st.button("Analyze Text", type="primary"):
 
         if show_api_tab:
             with tab4:
-                st.subheader("Enterprise API Integration")
-                st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
+                 st.subheader("Enterprise API Integration")
+                 st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
                 
-                api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
+                 api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
                 
-                st.markdown("#### Sample JSON API Response for Current Text:")
-                st.json(api_payload)
+                 st.markdown("#### Sample JSON API Response for Current Text:")
+                 st.json(api_payload)
 
-                st.markdown("#### FastAPI Server Implementation Snippet:")
-                st.code("""
+                 st.markdown("#### FastAPI Server Implementation Snippet:")
+                 st.code("""
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Import your analyzer function and loaded models here
