@@ -241,6 +241,18 @@ def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_thresh
     }
 
 
+# --- Initialize Supabase Client First ---
+from supabase import create_client
+
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_supabase()
+
+
 # --- Page Configuration & Sidebar ---
 st.set_page_config(page_title="Veridraft AI Detector Pro", page_icon="🔍", layout="wide")
 
@@ -304,109 +316,92 @@ if st.button("Analyze Text", type="primary"):
         with st.spinner("Evaluating structural signals and running multilingual ensemble..."):
             ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, active_models)
 
-        st.markdown("---")
-        
-        if show_api_tab:
-            tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
+        # Store critical outputs in session state so feedback and interactive elements don't lose context on rerun
+        st.session_state["ai_prob"] = ai_prob
+        st.session_state["burstiness"] = burstiness
+        st.session_state["ttr"] = ttr
+        st.session_state["perplexity"] = perplexity
+        st.session_state["sentence_data"] = sentence_data
+        st.session_state["target_text"] = target_text
+
+# Check if we have analysis stored in session state to render results and feedback section
+if "ai_prob" in st.session_state:
+    ai_prob = st.session_state["ai_prob"]
+    burstiness = st.session_state["burstiness"]
+    ttr = st.session_state["ttr"]
+    perplexity = st.session_state["perplexity"]
+    sentence_data = st.session_state["sentence_data"]
+    target_text = st.session_state["target_text"]
+
+    st.markdown("---")
+    
+    if show_api_tab:
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
+    else:
+        tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
+
+    with tab1:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Overall AI Score", f"{ai_prob * 100:.1f}%")
+        col2.metric("Burstiness (Length Var.)", f"{burstiness:.2f}")
+        col3.metric("Perplexity Index", f"{perplexity:.1f}")
+        col4.metric("Lexical Diversity (TTR)", f"{ttr:.1f}%")
+
+        st.markdown("#### Score Interpretation")
+        if ai_prob >= high_threshold:
+            st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
+        elif ai_prob >= low_threshold:
+            st.warning("⚡ **Mixed Signals Detected:** Contains a mix of human and AI-like sentence structures.")
         else:
-            tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
+            st.success("✅ **Likely Human-Written:** High structural variation and human stylistic traits.")
 
-        with tab1:
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Overall AI Score", f"{ai_prob * 100:.1f}%")
-            col2.metric("Burstiness (Length Var.)", f"{burstiness:.2f}")
-            col3.metric("Perplexity Index", f"{perplexity:.1f}")
-            col4.metric("Lexical Diversity (TTR)", f"{ttr:.1f}%")
+    with tab2:
+        st.subheader("Sentence-Level AI Map")
+        st.caption("Hover over highlighted sentences to view individual AI confidence scores.")
 
-            st.markdown("#### Score Interpretation")
-            if ai_prob >= high_threshold:
-                st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
-            elif ai_prob >= low_threshold:
-                st.warning("⚡ **Mixed Signals Detected:** Contains a mix of human and AI-like sentence structures.")
+        html_output = "<div style='line-height: 2.0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; background-color: #fafafa;'>"
+        for sent, score in sentence_data:
+            if score >= high_threshold:
+                bg_color = "rgba(255, 99, 71, 0.35)" # Red
+            elif score >= low_threshold:
+                bg_color = "rgba(255, 215, 0, 0.40)" # Yellow
             else:
-                st.success("✅ **Likely Human-Written:** High structural variation and human stylistic traits.")
+                bg_color = "rgba(144, 238, 144, 0.40)" # Green
 
-        with tab2:
-            st.subheader("Sentence-Level AI Map")
-            st.caption("Hover over highlighted sentences to view individual AI confidence scores.")
+            html_output += f"<span style='background-color: {bg_color}; margin: 2px; padding: 3px 6px; border-radius: 4px;' title='AI Score: {score * 100:.1f}%'>{sent}</span> "
+        html_output += "</div>"
 
-            html_output = "<div style='line-height: 2.0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; background-color: #fafafa;'>"
-            for sent, score in sentence_data:
-                if score >= high_threshold:
-                    bg_color = "rgba(255, 99, 71, 0.35)" # Red
-                elif score >= low_threshold:
-                    bg_color = "rgba(255, 215, 0, 0.40)" # Yellow
-                else:
-                    bg_color = "rgba(144, 238, 144, 0.40)" # Green
+        st.markdown(html_output, unsafe_allow_html=True)
+        st.markdown(f"<br>🔴 **High AI** (≥{int(high_threshold*100)}%) | 🟡 **Mixed** ({int(low_threshold*100)}% - {int(high_threshold*100)-1}%) | 🟢 **Human** (<{int(low_threshold*100)}%)", unsafe_allow_html=True)
 
-                html_output += f"<span style='background-color: {bg_color}; margin: 2px; padding: 3px 6px; border-radius: 4px;' title='AI Score: {score * 100:.1f}%'>{sent}</span> "
-            html_output += "</div>"
+    with tab3:
+        st.subheader("Export Results")
+        
+        csv_buffer = io.StringIO()
+        writer = csv.writer(csv_buffer)
+        writer.writerow(["Sentence", "AI_Probability_Percent"])
+        for sent, score in sentence_data:
+            writer.writerow([sent, f"{score * 100:.2f}"])
 
-            st.markdown(html_output, unsafe_allow_html=True)
-            st.markdown(f"<br>🔴 **High AI** (≥{int(high_threshold*100)}%) | 🟡 **Mixed** ({int(low_threshold*100)}% - {int(high_threshold*100)-1}%) | 🟢 **Human** (<{int(low_threshold*100)}%)", unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Download CSV Sentence Breakdown",
+            data=csv_buffer.getvalue(),
+            file_name="veridraft_analysis_report.csv",
+            mime="text/csv"
+        )
 
-        with tab3:
-            st.subheader("Export Results")
+    if show_api_tab:
+        with tab4:
+            st.subheader("Enterprise API Integration")
+            st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
             
-            csv_buffer = io.StringIO()
-            writer = csv.writer(csv_buffer)
-            writer.writerow(["Sentence", "AI_Probability_Percent"])
-            for sent, score in sentence_data:
-                writer.writerow([sent, f"{score * 100:.2f}"])
+            api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
+            
+            st.markdown("#### Sample JSON API Response for Current Text:")
+            st.json(api_payload)
 
-            st.download_button(
-                label="📥 Download CSV Sentence Breakdown",
-                data=csv_buffer.getvalue(),
-                file_name="veridraft_analysis_report.csv",
-                mime="text/csv"
-            )
-
-st.markdown("---")
-st.subheader("Report False Detection")
-
-feedback_type = st.radio(
-    "Was this classification accurate?",
-    [
-        "Accurate",
-        "False Positive (Human marked as AI)",
-        "False Negative (AI marked as Human)",
-    ],
-    key="feedback_type_radio",
-)
-user_notes = st.text_input(
-    "Optional notes for training improvement:", key="feedback_user_notes"
-)
-
-if st.button("Submit Feedback"):
-  try:
-    response = (
-        supabase.table("edge_cases")
-        .insert({
-            "actual_label": feedback_type,
-            "predicted_score": float(ai_prob),
-            "burstiness_cv": float(burstiness),
-            "user_notes": user_notes,
-            "text_snippet": target_text[:500],
-        })
-        .execute()
-    )
-
-    st.success("Thank you for your feedback! Data successfully logged to Supabase.")
-  except Exception as e:
-    st.error(f"Failed to log data to Supabase: {e}")
-
-  if show_api_tab:
-            with tab4:
-                 st.subheader("Enterprise API Integration")
-                 st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
-                
-                 api_payload = programmatic_analyze_text(target_text, active_models, high_threshold, low_threshold)
-                
-                 st.markdown("#### Sample JSON API Response for Current Text:")
-                 st.json(api_payload)
-
-                 st.markdown("#### FastAPI Server Implementation Snippet:")
-                 st.code("""
+            st.markdown("#### FastAPI Server Implementation Snippet:")
+            st.code("""
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # Import your analyzer function and loaded models here
@@ -422,14 +417,38 @@ def analyze_endpoint(payload: AnalysisRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-                """, language="python")
-# --- Initialize Supabase Client ---
-from supabase import create_client
+            """, language="python")
 
-@st.cache_resource
-def init_supabase():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
+    st.markdown("---")
+    st.subheader("Report False Detection")
 
-supabase = init_supabase()
+    feedback_type = st.radio(
+        "Was this classification accurate?",
+        [
+            "Accurate",
+            "False Positive (Human marked as AI)",
+            "False Negative (AI marked as Human)",
+        ],
+        key="feedback_type_radio",
+    )
+    user_notes = st.text_input(
+        "Optional notes for training improvement:", key="feedback_user_notes"
+    )
+
+    if st.button("Submit Feedback"):
+        try:
+            response = (
+                supabase.table("edge_cases")
+                .insert({
+                    "actual_label": feedback_type,
+                    "predicted_score": float(ai_prob),
+                    "burstiness_cv": float(burstiness),
+                    "user_notes": user_notes,
+                    "text_snippet": target_text[:500],
+                })
+                .execute()
+            )
+
+            st.success("Thank you for your feedback! Data successfully logged to Supabase.")
+        except Exception as e:
+            st.error(f"Failed to log data to Supabase: {e}")
