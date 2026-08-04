@@ -395,7 +395,7 @@ if st.button("Submit Feedback"):
   except Exception as e:
     st.error(f"Failed to log data to Supabase: {e}")
 
-        if show_api_tab:
+  if show_api_tab:
             with tab4:
                  st.subheader("Enterprise API Integration")
                  st.markdown("You can invoke Veridraft programmatically in your custom backend services (FastAPI/Flask/LMS integration) using the built-in `programmatic_analyze_text` function.")
