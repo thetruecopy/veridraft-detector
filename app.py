@@ -262,17 +262,11 @@ supabase = init_supabase()
 def inject_clarity(project_id: str):
     clarity_code = f"""
     <script type="text/javascript">
-        (function() {{
-            const parentDoc = window.parent.document;
-            if (!parentDoc.getElementById("clarity-analytics")) {{
-                const script = parentDoc.createElement("script");
-                script.id = "clarity-analytics";
-                script.type = "text/javascript";
-                script.async = true;
-                script.src = "https://www.clarity.ms/tag/{project_id}";
-                parentDoc.head.appendChild(script);
-            }}
-        }})();
+        (function(c,l,a,r,i,t,y){{
+            c[a]=c[a]||function(){{(c[a].q=c[a].q||[]).push(arguments)}};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        }})(window, document, "clarity", "script", "{project_id}");
     </script>
     """
     components.html(clarity_code, height=0, width=0)
