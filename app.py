@@ -29,7 +29,10 @@ def inject_clarity(project_id: str):
 
 CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
 if CLARITY_ID:
-    inject_clarity(CLARITY_ID)
+    try:
+        inject_clarity(CLARITY_ID)
+    except Exception:
+        pass
 # NLTK Safe Setup
 import nltk
 try:
@@ -300,7 +303,10 @@ def inject_clarity(project_id: str):
 
 CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
 if CLARITY_ID:
-    inject_clarity(CLARITY_ID)
+    try:
+        inject_clarity(CLARITY_ID)
+    except Exception:
+        pass
 
 st.sidebar.title("⚙️ Detection Settings")
 high_threshold = st.sidebar.slider("High AI Likelihood Cutoff (%)", 50, 90, 65) / 100.0
