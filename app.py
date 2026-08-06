@@ -279,6 +279,28 @@ supabase = init_supabase()
 
 # --- Page Configuration & Sidebar ---
 st.set_page_config(page_title="Veridraft AI Detector Pro", page_icon="🔍", layout="wide")
+# --- Microsoft Clarity Analytics ---
+def inject_clarity(project_id: str):
+    clarity_code = f"""
+    <script type="text/javascript">
+        (function() {{
+            const parentDoc = window.parent.document;
+            if (!parentDoc.getElementById("clarity-analytics")) {{
+                const script = parentDoc.createElement("script");
+                script.id = "clarity-analytics";
+                script.type = "text/javascript";
+                script.async = true;
+                script.src = "https://www.clarity.ms/tag/{project_id}";
+                parentDoc.head.appendChild(script);
+            }}
+        }})();
+    </script>
+    """
+    components.html(clarity_code, height=0, width=0)
+
+CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
+if CLARITY_ID:
+    inject_clarity(CLARITY_ID)
 
 st.sidebar.title("⚙️ Detection Settings")
 high_threshold = st.sidebar.slider("High AI Likelihood Cutoff (%)", 50, 90, 65) / 100.0
