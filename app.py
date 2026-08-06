@@ -4,8 +4,32 @@ import csv
 import numpy as np
 import streamlit as st
 import torch
+import streamlit.components.v1 as components
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+
+# Microsoft Clarity Analytics
+def inject_clarity(project_id: str):
+    clarity_code = f"""
+    <script type="text/javascript">
+        (function() {{
+            const parentDoc = window.parent.document;
+            if (!parentDoc.getElementById("clarity-analytics")) {{
+                const script = parentDoc.createElement("script");
+                script.id = "clarity-analytics";
+                script.type = "text/javascript";
+                script.async = true;
+                script.src = "https://www.clarity.ms/tag/{project_id}";
+                parentDoc.head.appendChild(script);
+            }}
+        }})();
+    </script>
+    """
+    components.html(clarity_code, height=0, width=0)
+
+CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
+if CLARITY_ID:
+    inject_clarity(CLARITY_ID)
 # NLTK Safe Setup
 import nltk
 try:
