@@ -8,31 +8,6 @@ import streamlit.components.v1 as components
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 
-# Microsoft Clarity Analytics
-def inject_clarity(project_id: str):
-    clarity_code = f"""
-    <script type="text/javascript">
-        (function() {{
-            const parentDoc = window.parent.document;
-            if (!parentDoc.getElementById("clarity-analytics")) {{
-                const script = parentDoc.createElement("script");
-                script.id = "clarity-analytics";
-                script.type = "text/javascript";
-                script.async = true;
-                script.src = "https://www.clarity.ms/tag/{project_id}";
-                parentDoc.head.appendChild(script);
-            }}
-        }})();
-    </script>
-    """
-    components.html(clarity_code, height=0, width=0)
-
-CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
-if CLARITY_ID:
-    try:
-        inject_clarity(CLARITY_ID)
-    except Exception:
-        pass
 # NLTK Safe Setup
 import nltk
 try:
@@ -267,6 +242,8 @@ def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_thresh
         "sentences": [{"sentence": s, "ai_score_percent": round(score * 100, 2)} for s, score in sentence_data]
     }
 
+# --- Page Configuration & Sidebar ---
+st.set_page_config(page_title="Veridraft AI Detector Pro", page_icon="🔍", layout="wide")
 
 # --- Initialize Supabase Client First ---
 from supabase import create_client
@@ -280,8 +257,7 @@ def init_supabase():
 supabase = init_supabase()
 
 
-# --- Page Configuration & Sidebar ---
-st.set_page_config(page_title="Veridraft AI Detector Pro", page_icon="🔍", layout="wide")
+
 # --- Microsoft Clarity Analytics ---
 def inject_clarity(project_id: str):
     clarity_code = f"""
@@ -301,7 +277,7 @@ def inject_clarity(project_id: str):
     """
     components.html(clarity_code, height=0, width=0)
 
-CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
+CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID")
 if CLARITY_ID:
     try:
         inject_clarity(CLARITY_ID)
