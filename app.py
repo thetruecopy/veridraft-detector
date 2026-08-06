@@ -277,7 +277,7 @@ def inject_clarity(project_id: str):
     """
     components.html(clarity_code, height=0, width=0)
 
-    try:
+try:
     CLARITY_ID = st.secrets.get("CLARITY_PROJECT_ID", "")
     if CLARITY_ID:
         inject_clarity(CLARITY_ID)
