@@ -190,7 +190,7 @@ def analyze_document(text, model_pairs):
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
         p3 = predict_text(chunk, tok3, mod3)
-        chunk_scores.append((p1 + p2 + p3) / 3.0)
+        chunk_scores.append((p1 + p2) / 2.0)
     
     base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
 
@@ -205,7 +205,7 @@ def analyze_document(text, model_pairs):
         p1 = predict_text(s, tok1, mod1)
         p2 = predict_text(s, tok2, mod2)
         p3 = predict_text(s, tok3, mod3)
-        avg_p = (p1 + p2 + p3) / 3.0
+        avg_p = (p1 + p2) / 2.0
         sentence_data.append((s, float(min(0.99, max(0.05, avg_p + evasion_adjustment)))))
 
     return global_ai_prob, burstiness, ttr, perplexity, sentence_data
@@ -292,7 +292,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
 st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.1 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.2 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
