@@ -282,7 +282,7 @@ show_api_tab = st.sidebar.checkbox("Enable Developer / API View", value=False)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
-st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector)
+st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector")
 st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
