@@ -135,21 +135,17 @@ def calculate_text_metrics(text, sentences):
 
 @st.cache_resource
 def load_ensemble_models():
-    """Loads English and Multilingual ensemble classifiers into memory."""
+    """Loads English AI ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
-    m3_name = "xlm-roberta-base"
-
+    
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
 
     tok2 = AutoTokenizer.from_pretrained(m2_name)
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
 
-    tok3 = AutoTokenizer.from_pretrained(m3_name)
-    mod3 = AutoModelForSequenceClassification.from_pretrained(m3_name, num_labels=2)
-
-    return (tok1, mod1), (tok2, mod2), (tok3, mod3)
+    return (tok1, mod1), (tok2, mod2)
 
 
 def get_ai_probability(outputs, model_config):
@@ -177,8 +173,8 @@ def predict_text(text, tok, mod):
 
 
 def analyze_document(text, model_pairs):
-    """Calculates overall AI likelihood and sentence-level scores using multilingual ensemble chunked processing."""
-    (tok1, mod1), (tok2, mod2), (tok3, mod3) = model_pairs
+    """Calculates overall AI likelihood and sentence-level scores using ensemble chunked processing."""
+    (tok1, mod1), (tok2, mod2) = model_pairs
 
     sentences = split_into_sentences(text)
     burstiness, ttr, perplexity = calculate_text_metrics(text, sentences)
@@ -189,7 +185,6 @@ def analyze_document(text, model_pairs):
     for chunk in chunks:
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
-        p3 = predict_text(chunk, tok3, mod3)
         chunk_scores.append((p1 + p2) / 2.0)
     
     base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
@@ -204,7 +199,6 @@ def analyze_document(text, model_pairs):
             continue
         p1 = predict_text(s, tok1, mod1)
         p2 = predict_text(s, tok2, mod2)
-        p3 = predict_text(s, tok3, mod3)
         avg_p = (p1 + p2) / 2.0
         sentence_data.append((s, float(min(0.99, max(0.05, avg_p + evasion_adjustment)))))
 
@@ -288,20 +282,20 @@ show_api_tab = st.sidebar.checkbox("Enable Developer / API View", value=False)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Model Specs")
-st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
-st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
+st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector)
+st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.2 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.3 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
 st.markdown("Analyze documents for AI content, sentence variation, lexical density, and line-by-line confidence maps.")
 
 try:
-    with st.spinner("Initializing multilingual models..."):
-        model_pair1, model_pair2, model_pair3 = load_ensemble_models()
-        active_models = (model_pair1, model_pair2, model_pair3)
+    with st.spinner("Initializing AI detection models..."):
+        model_pair1, model_pair2 = load_ensemble_models()
+        active_models = (model_pair1, model_pair2)
 except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
@@ -338,7 +332,7 @@ if st.button("Analyze Text", type="primary"):
     elif len(words) > MAX_WORD_COUNT:
         st.error(f"Text exceeds maximum limit of {MAX_WORD_COUNT} words.")
     else:
-        with st.spinner("Evaluating structural signals and running multilingual ensemble..."):
+        with st.spinner("Evaluating structural signals and running AI detection ensemble..."):
             ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, active_models)
 
         # Store critical outputs in session state so feedback and interactive elements don't lose context on rerun
