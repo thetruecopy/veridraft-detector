@@ -182,12 +182,19 @@ def analyze_document(text, model_pairs):
     chunks = chunk_text_by_sentences(sentences, max_words_per_chunk=400)
 
     chunk_scores = []
+    model1_scores = []
+    model2_scores = []
     for chunk in chunks:
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
+        
+        model1_scores.append(p1)
+        model2_scores.append(p2)
         chunk_scores.append((p1 + p2) / 2.0)
     
     base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
+    model1_avg = float(np.mean(model1_scores)) if model1_scores else 0.5
+    model2_avg = float(np.mean(model2_scores)) if model2_scores else 0.5
 
     evasion_adjustment = check_evasion_heuristics(text, ttr, burstiness)
     global_ai_prob = float(min(0.99, max(0.05, base_ai_prob + evasion_adjustment)))
@@ -201,8 +208,15 @@ def analyze_document(text, model_pairs):
         p2 = predict_text(s, tok2, mod2)
         avg_p = (p1 + p2) / 2.0
         sentence_data.append((s, float(min(0.99, max(0.05, avg_p + evasion_adjustment)))))
-
-    return global_ai_prob, burstiness, ttr, perplexity, sentence_data
+        
+    diagnostics = {
+        "model1_avg": model1_avg,
+        "model2_avg": model2_avg,
+        "base_ai_prob": base_ai_prob,
+        "evasion_adjustment": evasion_adjustment,
+        "final_ai_prob": global_ai_prob,
+    }
+    return global_ai_prob, burstiness, ttr, perplexity, sentence_data, diagnostics
 
 
 def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_threshold=0.35):
@@ -215,7 +229,7 @@ def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_thresh
     if len(words) > MAX_WORD_COUNT:
         return {"error": f"Text exceeds maximum limit of {MAX_WORD_COUNT} words."}
 
-    ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(cleaned_text, model_pairs)
+    ai_prob, burstiness, ttr, perplexity, sentence_data, diagnostics = analyze_document(cleaned_text, model_pairs)
     
     if ai_prob >= high_threshold:
         classification = "High Probability of AI Generation"
@@ -227,6 +241,7 @@ def programmatic_analyze_text(text, model_pairs, high_threshold=0.65, low_thresh
     return {
         "overall_ai_score_percent": round(ai_prob * 100, 2),
         "classification": classification,
+        "diagnostics": diagnostics,
         "metrics": {
             "burstiness": round(burstiness, 2),
             "perplexity": round(perplexity, 1),
@@ -286,7 +301,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector")
 st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.3 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.4 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -333,7 +348,7 @@ if st.button("Analyze Text", type="primary"):
         st.error(f"Text exceeds maximum limit of {MAX_WORD_COUNT} words.")
     else:
         with st.spinner("Evaluating structural signals and running AI detection ensemble..."):
-            ai_prob, burstiness, ttr, perplexity, sentence_data = analyze_document(target_text, active_models)
+            ai_prob, burstiness, ttr, perplexity, sentence_data, diagnostics = analyze_document(target_text, active_models)
 
         # Store critical outputs in session state so feedback and interactive elements don't lose context on rerun
         st.session_state["ai_prob"] = ai_prob
@@ -342,7 +357,8 @@ if st.button("Analyze Text", type="primary"):
         st.session_state["perplexity"] = perplexity
         st.session_state["sentence_data"] = sentence_data
         st.session_state["target_text"] = target_text
-
+        st.session_state["diagnostics"] = diagnostics
+        
 # Check if we have analysis stored in session state to render results and feedback section
 if "ai_prob" in st.session_state:
     ai_prob = st.session_state["ai_prob"]
@@ -351,6 +367,7 @@ if "ai_prob" in st.session_state:
     perplexity = st.session_state["perplexity"]
     sentence_data = st.session_state["sentence_data"]
     target_text = st.session_state["target_text"]
+    diagnostics = st.session_state["diagnostics"]
 
     st.markdown("---")
     
@@ -366,6 +383,16 @@ if "ai_prob" in st.session_state:
         col3.metric("Perplexity Index", f"{perplexity:.1f}")
         col4.metric("Lexical Diversity (TTR)", f"{ttr:.1f}%")
 
+    if show_api_tab:
+    st.markdown("### 🔬 Developer Diagnostics")
+    d1, d2, d3, d4, d5 = st.columns(5)
+
+    d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
+    d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
+    d3.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
+    d4.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
+    d5.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
+    
         st.markdown("#### Score Interpretation")
         if ai_prob >= high_threshold:
             st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
