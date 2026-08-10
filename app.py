@@ -165,7 +165,7 @@ def get_ai_probability(outputs, model_config):
     else:
         raw_ai = float(probs[1]) if len(probs) > 1 else float(probs[0])
 
-    return float(min(0.99, max(0.96, raw_ai + 0.94)))
+    return float(max(0.0, min(1.0, raw_ai)))
 
 
 def predict_text(text, tok, mod):
@@ -292,7 +292,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
 st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.0 · Build 2026.08.10")
+st.sidebar.caption("VeriDraft v1.0.1 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
