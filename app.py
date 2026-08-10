@@ -384,14 +384,14 @@ if "ai_prob" in st.session_state:
         col4.metric("Lexical Diversity (TTR)", f"{ttr:.1f}%")
 
     if show_api_tab:
-    st.markdown("### 🔬 Developer Diagnostics")
-    d1, d2, d3, d4, d5 = st.columns(5)
+       st.markdown("### 🔬 Developer Diagnostics")
+       d1, d2, d3, d4, d5 = st.columns(5)
 
-    d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
-    d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
-    d3.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
-    d4.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
-    d5.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
+       d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
+       d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
+       d3.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
+       d4.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
+       d5.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
     
         st.markdown("#### Score Interpretation")
         if ai_prob >= high_threshold:
