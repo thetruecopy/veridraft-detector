@@ -291,6 +291,9 @@ st.sidebar.subheader("📌 Model Specs")
 st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector + XLM-RoBERTa")
 st.sidebar.caption("Engine: Chunked Processing + Multilingual + Evasion Shield + Enterprise API")
 
+st.sidebar.markdown("---")
+st.sidebar.caption("VeriDraft v1.0.0 · Build 2026.08.10")
+
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
 st.markdown("Analyze documents for AI content, sentence variation, lexical density, and line-by-line confidence maps.")
