@@ -393,13 +393,13 @@ if "ai_prob" in st.session_state:
        d4.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
        d5.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
     
-        st.markdown("#### Score Interpretation")
-        if ai_prob >= high_threshold:
-            st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
-        elif ai_prob >= low_threshold:
-            st.warning("⚡ **Mixed Signals Detected:** Contains a mix of human and AI-like sentence structures.")
-        else:
-            st.success("✅ **Likely Human-Written:** High structural variation and human stylistic traits.")
+    st.markdown("#### Score Interpretation")
+    if ai_prob >= high_threshold:
+      st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
+    elif ai_prob >= low_threshold:
+      st.warning("⚡ **Mixed Signals Detected:** Contains a mix of human and AI-like sentence structures.")
+    else:
+      st.success("✅ **Likely Human-Written:** High structural variation and human stylistic traits.")
 
     with tab2:
         st.subheader("Sentence-Level AI Map")
