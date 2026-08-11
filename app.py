@@ -138,7 +138,7 @@ def load_ensemble_models():
     """Loads English AI ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
-    m3_name = "Oxidane/tmr-ai-text-detector"
+    m3_name = "fakespot-ai/roberta-base-ai-text-detection-v1"
     
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
@@ -310,7 +310,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector")
 st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.5 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.6 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -398,7 +398,7 @@ if "ai_prob" in st.session_state:
 
        d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
        d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
-       d3.metric("TMR AI", f"{diagnostics['model3_avg'] * 100:.1f}%")
+       d3.metric("Fakespot AI", f"{diagnostics['model3_avg'] * 100:.1f}%")
        d4.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
        d5.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
        d6.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
