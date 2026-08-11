@@ -205,7 +205,13 @@ def analyze_document(text, model_pairs):
     model3_avg = float(np.mean(model3_scores)) if model3_scores else 0.5
 
     experimental_3model_avg = (model1_avg + model2_avg + model3_avg) / 3.0
+    experimental_weighted_avg = (
+        0.05 * model1_avg +
+        0.20 * model2_avg +
+        0.75 * model3_avg
+    )
 
+    
     evasion_adjustment = check_evasion_heuristics(text, ttr, burstiness)
     global_ai_prob = float(min(0.99, max(0.05, base_ai_prob + evasion_adjustment)))
 
@@ -224,6 +230,7 @@ def analyze_document(text, model_pairs):
         "model2_avg": model2_avg,
         "model3_avg": model3_avg,
         "experimental_3model_avg": experimental_3model_avg,
+        "experimental_weighted_avg": experimental_weighted_avg,
         "base_ai_prob": base_ai_prob,
         "evasion_adjustment": evasion_adjustment,
         "final_ai_prob": global_ai_prob,
@@ -313,7 +320,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector")
 st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.7 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.8 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -397,15 +404,16 @@ if "ai_prob" in st.session_state:
 
     if show_api_tab:
        st.markdown("### 🔬 Developer Diagnostics")
-       d1, d2, d3, d4, d5, d6, d7 = st.columns(7)
+       d1, d2, d3, d4, d5, d6, d7, d8 = st.columns(8)
 
        d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
        d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
        d3.metric("Fakespot AI", f"{diagnostics['model3_avg'] * 100:.1f}%")
        d4.metric("3-Model Test", f"{diagnostics['experimental_3model_avg'] * 100:.1f}%")
-       d5.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
-       d6.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
-       d7.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
+       d5.metric("Weighted Test", f"{diagnostics['experimental_weighted_avg'] * 100:.1f}%")
+       d6.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
+       d7.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
+       d8.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
    
     st.markdown("#### Score Interpretation")
     if ai_prob >= high_threshold:
