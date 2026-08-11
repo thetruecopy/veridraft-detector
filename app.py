@@ -138,6 +138,7 @@ def load_ensemble_models():
     """Loads English AI ensemble classifiers into memory."""
     m1_name = "roberta-base-openai-detector"
     m2_name = "Hello-SimpleAI/chatgpt-detector-roberta"
+    m3_name = "Oxidane/tmr-ai-text-detector"
     
     tok1 = AutoTokenizer.from_pretrained(m1_name)
     mod1 = AutoModelForSequenceClassification.from_pretrained(m1_name)
@@ -145,7 +146,10 @@ def load_ensemble_models():
     tok2 = AutoTokenizer.from_pretrained(m2_name)
     mod2 = AutoModelForSequenceClassification.from_pretrained(m2_name)
 
-    return (tok1, mod1), (tok2, mod2)
+    tok3 = AutoTokenizer.from_pretrained(m3_name)
+    mod3 = AutoModelForSequenceClassification.from_pretrained(m3_name)
+
+    return (tok1, mod1), (tok2, mod2), (tok3, mod3)
 
 
 def get_ai_probability(outputs, model_config):
@@ -174,7 +178,7 @@ def predict_text(text, tok, mod):
 
 def analyze_document(text, model_pairs):
     """Calculates overall AI likelihood and sentence-level scores using ensemble chunked processing."""
-    (tok1, mod1), (tok2, mod2) = model_pairs
+    (tok1, mod1), (tok2, mod2), (tok3, mod3) = model_pairs
 
     sentences = split_into_sentences(text)
     burstiness, ttr, perplexity = calculate_text_metrics(text, sentences)
@@ -184,17 +188,21 @@ def analyze_document(text, model_pairs):
     chunk_scores = []
     model1_scores = []
     model2_scores = []
+    model3_scores = []
     for chunk in chunks:
         p1 = predict_text(chunk, tok1, mod1)
         p2 = predict_text(chunk, tok2, mod2)
+        p3 = predict_text(chunk, tok3, mod3)
         
         model1_scores.append(p1)
         model2_scores.append(p2)
+        model3_scores.append(p3)
         chunk_scores.append((p1 + p2) / 2.0)
     
     base_ai_prob = float(np.mean(chunk_scores)) if chunk_scores else 0.5
     model1_avg = float(np.mean(model1_scores)) if model1_scores else 0.5
     model2_avg = float(np.mean(model2_scores)) if model2_scores else 0.5
+    model3_avg = float(np.mean(model3_scores)) if model3_scores else 0.5
 
     evasion_adjustment = check_evasion_heuristics(text, ttr, burstiness)
     global_ai_prob = float(min(0.99, max(0.05, base_ai_prob + evasion_adjustment)))
@@ -212,6 +220,7 @@ def analyze_document(text, model_pairs):
     diagnostics = {
         "model1_avg": model1_avg,
         "model2_avg": model2_avg,
+        "model3_avg": model3_avg,
         "base_ai_prob": base_ai_prob,
         "evasion_adjustment": evasion_adjustment,
         "final_ai_prob": global_ai_prob,
@@ -301,7 +310,7 @@ st.sidebar.caption("Ensemble: RoBERTa OpenAI + ChatGPT Detector")
 st.sidebar.caption("Engine: Chunked Processing + Evasion Shield + Enterprise API")
 
 st.sidebar.markdown("---")
-st.sidebar.caption("VeriDraft v1.0.4 · Build 2026.08.11")
+st.sidebar.caption("VeriDraft v1.0.5 · Build 2026.08.11")
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
@@ -309,8 +318,8 @@ st.markdown("Analyze documents for AI content, sentence variation, lexical densi
 
 try:
     with st.spinner("Initializing AI detection models..."):
-        model_pair1, model_pair2 = load_ensemble_models()
-        active_models = (model_pair1, model_pair2)
+        model_pair1, model_pair2, model_pair3 = load_ensemble_models()
+        active_models = (model_pair1, model_pair2, model_pair3)
 except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
@@ -385,14 +394,15 @@ if "ai_prob" in st.session_state:
 
     if show_api_tab:
        st.markdown("### 🔬 Developer Diagnostics")
-       d1, d2, d3, d4, d5 = st.columns(5)
+       d1, d2, d3, d4, d5, d6 = st.columns(6)
 
        d1.metric("Model 1 AI", f"{diagnostics['model1_avg'] * 100:.1f}%")
        d2.metric("Model 2 AI", f"{diagnostics['model2_avg'] * 100:.1f}%")
-       d3.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
-       d4.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
-       d5.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
-    
+       d3.metric("TMR AI", f"{diagnostics['model3_avg'] * 100:.1f}%")
+       d4.metric("Base Ensemble", f"{diagnostics['base_ai_prob'] * 100:.1f}%")
+       d5.metric("Heuristic Adj.", f"{diagnostics['evasion_adjustment'] * 100:+.1f}%")
+       d6.metric("Final AI", f"{diagnostics['final_ai_prob'] * 100:.1f}%")
+   
     st.markdown("#### Score Interpretation")
     if ai_prob >= high_threshold:
       st.error("⚠️ **High Probability of AI Generation:** Text exhibits uniform structures typical of LLMs.")
