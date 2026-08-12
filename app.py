@@ -551,23 +551,23 @@ def analyze_endpoint(payload: AnalysisRequest):
                             ]
 
                             if not invalid_labels.empty:
-                                   st.error("Label column must contain only `AI` or `Human`.")
+                                st.error("Label column must contain only `AI` or `Human`.")
                             else:
                                 st.success(f"Calibration file loaded successfully: {len(calibration_df)} samples.")
                                 st.dataframe(calibration_df.head())
                                    
-                                   run_calibration = st.button(
-                                       "Run Calibration",
-                                       type="primary",
-                                       key="run_calibration"
-                                    )
+                                run_calibration = st.button(
+                                    "Run Calibration",
+                                    type="primary",
+                                    key="run_calibration"
+                                )
     
-                                   if run_calibration:
-                                       if calibration_df.empty:
-                                            st.error("Calibration CSV contains no samples.")
-                                            st.stop()
+                                if run_calibration:
+                                    if calibration_df.empty:
+                                        st.error("Calibration CSV contains no samples.")
+                                        st.stop()
                                             
-                                       first_row = calibration_df.iloc[0]
+                                    first_row = calibration_df.iloc[0]
                                     
                                        sample_text = str(first_row["text"])
                                        actual_label = str(first_row["label"]).strip()
