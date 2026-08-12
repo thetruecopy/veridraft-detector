@@ -335,6 +335,8 @@ except Exception as e:
     st.error(f"Error loading models: {e}")
     st.stop()
 
+calibration_file = None
+
 uploaded_file = st.file_uploader("Or upload document (.txt, .pdf, .docx):", type=["txt", "pdf", "docx"])
 user_input = st.text_area("Or paste text to analyze:", height=150, placeholder="Paste text here or upload a document above...")
 
@@ -521,9 +523,7 @@ def analyze_endpoint(payload: AnalysisRequest):
             st.success("Thank you for your feedback! Data successfully logged to Supabase.")
         except Exception as e:
             st.error(f"Failed to log data to Supabase: {e}")
-            
-        calibration_file = None
-           
+                     
         if show_api_tab:
             with tab5:
                 st.subheader("🧪 Calibration Lab")
