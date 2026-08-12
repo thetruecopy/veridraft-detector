@@ -569,27 +569,27 @@ def analyze_endpoint(payload: AnalysisRequest):
                                             
                                     first_row = calibration_df.iloc[0]
                                     
-                                       sample_text = str(first_row["text"])
-                                       actual_label = str(first_row["label"]).strip()
+                                    sample_text = str(first_row["text"])
+                                    actual_label = str(first_row["label"]).strip()
 
-                                       ai_prob_cal, burstiness_cal, ttr_cal, perplexity_cal, sentence_data_cal, diagnostics_cal = analyze_document(
-                                            sample_text,
-                                            active_models
-                                       )
+                                    ai_prob_cal, burstiness_cal, ttr_cal, perplexity_cal, sentence_data_cal, diagnostics_cal = analyze_document(
+                                        sample_text,
+                                        active_models
+                                    )
                                         
-                                       st.markdown("### First-row safety test")
-                                       st.write(f"Ground truth: {actual_label}")
-                                       st.write(sample_text)
+                                    st.markdown("### First-row safety test")
+                                    st.write(f"Ground truth: {actual_label}")
+                                    st.write(sample_text)
 
-                                       st.markdown("### Diagnostic result")
+                                    st.markdown("### Diagnostic result")
 
-                                       c1, c2, c3, c4, c5 = st.columns(5)
+                                    c1, c2, c3, c4, c5 = st.columns(5)
                                             
-                                       c1.metric("Model 1 AI", f"{diagnostics_cal['model1_avg'] * 100:.1f}%")
-                                       c2.metric("Model 2 AI", f"{diagnostics_cal['model2_avg'] * 100:.1f}%")
-                                       c3.metric("Fakespot AI", f"{diagnostics_cal['model3_avg'] * 100:.1f}%")
-                                       c4.metric("Weighted Test", f"{diagnostics_cal['experimental_weighted_avg'] * 100:.1f}%")
-                                       c5.metric("Current Final", f"{ai_prob_cal * 100:.1f}%")
+                                    c1.metric("Model 1 AI", f"{diagnostics_cal['model1_avg'] * 100:.1f}%")
+                                    c2.metric("Model 2 AI", f"{diagnostics_cal['model2_avg'] * 100:.1f}%")
+                                    c3.metric("Fakespot AI", f"{diagnostics_cal['model3_avg'] * 100:.1f}%")
+                                    c4.metric("Weighted Test", f"{diagnostics_cal['experimental_weighted_avg'] * 100:.1f}%")
+                                    c5.metric("Current Final", f"{ai_prob_cal * 100:.1f}%")
                                            
                        except Exception as e:
                           st.error(f"Could not read calibration CSV: {e}")
