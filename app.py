@@ -533,28 +533,28 @@ def analyze_endpoint(payload: AnalysisRequest):
                     key="calibration_csv"
                 )
 
-                   st.markdown("**Expected CSV columns:** `text`, `label`")
-                   st.caption("Use `AI` or `Human` in the label column.")
+                st.markdown("**Expected CSV columns:** `text`, `label`")
+                st.caption("Use `AI` or `Human` in the label column.")
 
 
-                   if calibration_file is not None:
-                       try:
-                           calibration_df = pd.read_csv(calibration_file)
+                if calibration_file is not None:
+                    try:
+                        calibration_df = pd.read_csv(calibration_file)
 
-                           required_columns = {"text", "label"}
+                        required_columns = {"text", "label"}
 
-                           if not required_columns.issubset(calibration_df.columns):
-                               st.error("CSV must contain both `text` and `label` columns.")
-                           else:
-                               invalid_labels = calibration_df[
-                                   ~calibration_df["label"].astype(str).str.strip().isin(["AI", "Human"])
-                               ]
+                        if not required_columns.issubset(calibration_df.columns):
+                            st.error("CSV must contain both `text` and `label` columns.")
+                        else:
+                            invalid_labels = calibration_df[
+                                ~calibration_df["label"].astype(str).str.strip().isin(["AI", "Human"])
+                            ]
 
-                               if not invalid_labels.empty:
+                            if not invalid_labels.empty:
                                    st.error("Label column must contain only `AI` or `Human`.")
-                               else:
-                                   st.success(f"Calibration file loaded successfully: {len(calibration_df)} samples.")
-                                   st.dataframe(calibration_df.head())
+                            else:
+                                st.success(f"Calibration file loaded successfully: {len(calibration_df)} samples.")
+                                st.dataframe(calibration_df.head())
                                    
                                    run_calibration = st.button(
                                        "Run Calibration",
