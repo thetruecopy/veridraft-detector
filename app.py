@@ -4,6 +4,7 @@ import csv
 import numpy as np
 import streamlit as st
 import torch
+import pandas as pd
 import streamlit.components.v1 as components
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
@@ -391,7 +392,7 @@ if "ai_prob" in st.session_state:
     st.markdown("---")
     
     if show_api_tab:
-        tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback", "🚀 Enterprise API", "🧪 Calibration Lab"])
     else:
         tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
 
@@ -520,3 +521,24 @@ def analyze_endpoint(payload: AnalysisRequest):
             st.success("Thank you for your feedback! Data successfully logged to Supabase.")
         except Exception as e:
             st.error(f"Failed to log data to Supabase: {e}")
+           
+            if show_api_tab:
+               with tab5:
+                   st.subheader("🧪 Calibration Lab")
+                   st.caption("Batch-test labeled samples against VeriDraft diagnostics without changing production scoring.")
+
+                   calibration_file = st.file_uploader(
+                       "Upload calibration CSV",
+                       type=["csv"],
+                       key="calibration_csv"
+                   )
+
+                   st.markdown("**Expected CSV columns:** `text`, `label`")
+                   st.caption("Use `AI` or `Human` in the label column.")
+
+                   if calibration_file is not None:
+                   try:
+                   calibration_df = pd.read_csv(calibration_file)
+                   st.dataframe(calibration_df.head())
+        except Exception as e:
+                   st.error(f"Could not read calibration CSV: {e}")
