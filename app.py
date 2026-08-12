@@ -536,9 +536,60 @@ def analyze_endpoint(payload: AnalysisRequest):
                    st.markdown("**Expected CSV columns:** `text`, `label`")
                    st.caption("Use `AI` or `Human` in the label column.")
 
+
                    if calibration_file is not None:
-                   try:
-                   calibration_df = pd.read_csv(calibration_file)
-                   st.dataframe(calibration_df.head())
-        except Exception as e:
-                   st.error(f"Could not read calibration CSV: {e}")
+                       try:
+                           calibration_df = pd.read_csv(calibration_file)
+
+                           required_columns = {"text", "label"}
+
+                           if not required_columns.issubset(calibration_df.columns):
+                               st.error("CSV must contain both `text` and `label` columns.")
+                           else:
+                               invalid_labels = calibration_df[
+                                   ~calibration_df["label"].astype(str).str.strip().isin(["AI", "Human"])
+                               ]
+
+                               if not invalid_labels.empty:
+                                   st.error("Label column must contain only `AI` or `Human`.")
+                               else:
+                                   st.success(f"Calibration file loaded successfully: {len(calibration_df)} samples.")
+                                   st.dataframe(calibration_df.head())
+                                   
+                                   run_calibration = st.button(
+                                       "Run Calibration",
+                                       type="primary",
+                                       key="run_calibration"
+                                    )
+    
+                                    if run_calibration:
+                                        if calibration_df.empty:
+                                            st.error("Calibration CSV contains no samples.")
+                                            st.stop()
+                                            
+                                        first_row = calibration_df.iloc[0]
+                                    
+                                        sample_text = str(first_row["text"])
+                                        actual_label = str(first_row["label"]).strip()
+
+                                        ai_prob_cal, burstiness_cal, ttr_cal, perplexity_cal, sentence_data_cal, diagnostics_cal = analyze_document(
+                                            sample_text,
+                                            active_models
+                                        )
+                                        
+                                        st.markdown("### First-row safety test")
+                                        st.write(f"Ground truth: {actual_label}")
+                                        st.write(sample_text)
+
+                                        st.markdown("### Diagnostic result")
+
+                                            c1, c2, c3, c4, c5 = st.columns(5)
+                                            
+                                            c1.metric("Model 1 AI", f"{diagnostics_cal['model1_avg'] * 100:.1f}%")
+                                            c2.metric("Model 2 AI", f"{diagnostics_cal['model2_avg'] * 100:.1f}%")
+                                            c3.metric("Fakespot AI", f"{diagnostics_cal['model3_avg'] * 100:.1f}%")
+                                            c4.metric("Weighted Test", f"{diagnostics_cal['experimental_weighted_avg'] * 100:.1f}%")
+                                            c5.metric("Current Final", f"{ai_prob_cal * 100:.1f}%")
+                                           
+                      except Exception as e:
+                          st.error(f"Could not read calibration CSV: {e}")
