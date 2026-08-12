@@ -398,6 +398,11 @@ if "ai_prob" in st.session_state:
     else:
         tab1, tab2, tab3 = st.tabs(["📊 Summary & Metrics", "🔍 Sentence AI Map", "💾 Export & Feedback"])
 
+    if show_api_tab:
+        with tab5:
+            st.subheader("🧪 Calibration Lab")
+            st.success("Calibration Lab container is working.")
+
     with tab1:
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Overall AI Score", f"{ai_prob * 100:.1f}%")
