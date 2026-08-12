@@ -522,16 +522,16 @@ def analyze_endpoint(payload: AnalysisRequest):
         except Exception as e:
             st.error(f"Failed to log data to Supabase: {e}")
            
-            if show_api_tab:
-               with tab5:
-                   st.subheader("🧪 Calibration Lab")
-                   st.caption("Batch-test labeled samples against VeriDraft diagnostics without changing production scoring.")
+        if show_api_tab:
+            with tab5:
+                st.subheader("🧪 Calibration Lab")
+                st.caption("Batch-test labeled samples against VeriDraft diagnostics without changing production scoring.")
 
-                   calibration_file = st.file_uploader(
-                       "Upload calibration CSV",
-                       type=["csv"],
-                       key="calibration_csv"
-                   )
+                calibration_file = st.file_uploader(
+                    "Upload calibration CSV",
+                    type=["csv"],
+                    key="calibration_csv"
+                )
 
                    st.markdown("**Expected CSV columns:** `text`, `label`")
                    st.caption("Use `AI` or `Human` in the label column.")
