@@ -591,5 +591,5 @@ def analyze_endpoint(payload: AnalysisRequest):
                                        c4.metric("Weighted Test", f"{diagnostics_cal['experimental_weighted_avg'] * 100:.1f}%")
                                        c5.metric("Current Final", f"{ai_prob_cal * 100:.1f}%")
                                            
-                      except Exception as e:
+                       except Exception as e:
                           st.error(f"Could not read calibration CSV: {e}")
