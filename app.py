@@ -1096,7 +1096,7 @@ else:
     )
 
 # --- Public Header ---
-st.image("veridraft_logo.png", width=180)
+st.image("veridraft_logo.png", width=230)
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
