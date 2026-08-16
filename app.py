@@ -1095,16 +1095,21 @@ else:
         "Paste text or upload a file, then use Analyze Document to view the result."
     )
 
+# --- Public Header ---
+st.image("veridraft_logo.png", width=180)
+
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
 st.markdown(
-    "Analyze documents for AI content, sentence variation, lexical density, and line-by-line confidence maps."
+    "**Check whether your text shows signs of AI-generated writing and see which sentences contribute most to the result.**"
 )
-if not INTERNAL_TOOLS_ENABLED:
-    st.caption(
-        "PB-1 product baseline · Internal developer, API, and calibration tools are not exposed in public mode."
-    )
 
+    st.caption(
+       "Paste your text below or upload a document. VeriDraft will analyze it and give you an overall AI score, "
+       "a sentence-by-sentence breakdown, and supporting writing metrics."
+    )
+if INTERNAL_TOOLS_ENABLED:
+        st.caption(f"Internal mode · Product baseline: {PRODUCT_BASELINE}")
 try:
     with st.spinner("Initializing AI detection models..."):
         model_pair1, model_pair2, model_pair3 = load_ensemble_models()
