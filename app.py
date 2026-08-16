@@ -1100,16 +1100,18 @@ st.image("veridraft_logo.png", width=180)
 
 # --- Main Interface ---
 st.title("🔍 Veridraft AI Detector Pro")
+
 st.markdown(
     "**Check whether your text shows signs of AI-generated writing and see which sentences contribute most to the result.**"
 )
 
-    st.caption(
+st.caption(
        "Paste your text below or upload a document. VeriDraft will analyze it and give you an overall AI score, "
        "a sentence-by-sentence breakdown, and supporting writing metrics."
-    )
+)
 if INTERNAL_TOOLS_ENABLED:
-        st.caption(f"Internal mode · Product baseline: {PRODUCT_BASELINE}")
+    st.caption(f"Internal mode · Product baseline: {PRODUCT_BASELINE}")
+    
 try:
     with st.spinner("Initializing AI detection models..."):
         model_pair1, model_pair2, model_pair3 = load_ensemble_models()
